@@ -100,6 +100,7 @@ No backend required — the entire game runs in the browser as a static HTML5 si
 
 ```bash
 npm run dev      # start the local dev server
+npm run validate:resources
 npm run build    # type-check and build production files into dist/
 npm run preview  # preview the production build locally
 ```
@@ -266,6 +267,18 @@ repairDenied: authorization required before repair routines can run
 repairComplete: true
 hidden: false
 ```
+
+### Resource validation
+
+Run resource assertions directly with:
+
+```bash
+npm run validate:resources
+```
+
+`npm run build` runs the same validation before TypeScript and Vite. In the browser,
+resource assertion failures render a fatal developer screen instead of silently
+starting with broken content.
 
 ## Adding new puzzles
 

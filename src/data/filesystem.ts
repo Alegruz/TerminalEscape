@@ -1,3 +1,9 @@
+import {
+  assertNoResourceIssues,
+  parseResourceHeader,
+  validateResourceTree,
+} from './ResourceValidation.ts';
+
 export type FSFile = {
   type: 'file';
   content: string;
@@ -60,71 +66,6 @@ function getOrCreateDir(parent: FSDir, name: string): FSDir {
   return dir;
 }
 
-function parseHeader(path: string, content: string): FSFileHeader {
-  const header: FSFileHeader = {};
-
-  for (const rawLine of content.split('\n')) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith('#')) continue;
-
-    const separatorIndex = line.indexOf(':');
-    if (separatorIndex === -1) continue;
-
-    const key = line.slice(0, separatorIndex).trim();
-    const value = line.slice(separatorIndex + 1).trim();
-
-    if (key === 'hidden') {
-      header.hidden = value === 'true';
-    } else if (key === 'accessFlag') {
-      header.accessFlag = parseStateFlag(path, key, value);
-    } else if (key === 'accessDenied') {
-      header.accessDenied = value;
-    } else if (key === 'repairFlag') {
-      header.repairFlag = parseStateFlag(path, key, value);
-    } else if (key === 'repairRequiresFlag') {
-      header.repairRequiresFlag = parseStateFlag(path, key, value);
-    } else if (key === 'repairAlias') {
-      header.repairAlias = value;
-    } else if (key === 'repairDenied') {
-      header.repairDenied = value;
-    } else if (key === 'repairComplete') {
-      header.repairComplete = value === 'true';
-    } else if (key === 'scanFlag') {
-      header.scanFlag = parseStateFlag(path, key, value);
-    } else if (key === 'scanMessage') {
-      header.scanMessage = value;
-    } else if (key === 'puzzleId') {
-      header.puzzleId = value;
-    } else if (key === 'cipher' && value === 'caesar') {
-      header.cipher = value;
-    } else if (key === 'key') {
-      const parsed = parseInt(value, 10);
-      if (!Number.isFinite(parsed)) throw new Error(`Invalid key in ${path}`);
-      header.key = parsed;
-    } else if (key === 'answerCode') {
-      header.answerCode = value;
-    } else if (key === 'solveFlag') {
-      header.solveFlag = parseStateFlag(path, key, value);
-    } else {
-      throw new Error(`Unknown header field '${key}' in ${path}`);
-    }
-  }
-
-  return header;
-}
-
-function isStateFlag(value: string): value is FSStateFlag {
-  return value === 'emergencyDecrypted' ||
-    value === 'navUnlocked' ||
-    value === 'navScanned' ||
-    value === 'navRepaired';
-}
-
-function parseStateFlag(path: string, key: string, value: string): FSStateFlag {
-  if (isStateFlag(value)) return value;
-  throw new Error(`Invalid ${key} value '${value}' in ${path}`);
-}
-
 function findFile(root: FSDir, path: string): FSFile | null {
   const parts = path.split('/').filter(Boolean);
   const fileName = parts.pop();
@@ -165,50 +106,9 @@ function addHeader(root: FSDir, headerPath: string, content: string): void {
     throw new Error(`Header file has no target resource: ${headerPath}`);
   }
 
-  targetFile.header = parseHeader(headerPath, content);
-}
-
-function validateHeaders(root: FSDir): void {
-  const repairAliases = new Map<string, string>();
-  walkFiles(root, '/', (path, file) => {
-    const header = file.header;
-    if (!header) return;
-
-    if (header.repairAlias) {
-      const existingPath = repairAliases.get(header.repairAlias);
-      if (existingPath) {
-        throw new Error(`Duplicate repairAlias '${header.repairAlias}' in ${path} and ${existingPath}`);
-      }
-      repairAliases.set(header.repairAlias, path);
-    }
-
-    if (header.repairComplete && !header.repairFlag) {
-      throw new Error(`repairComplete requires repairFlag in ${path}`);
-    }
-    if (header.repairRequiresFlag && !header.repairFlag) {
-      throw new Error(`repairRequiresFlag requires repairFlag in ${path}`);
-    }
-    if (header.puzzleId) {
-      if (!header.cipher || header.key === undefined || !header.answerCode || !header.solveFlag) {
-        throw new Error(`Puzzle header requires cipher, key, answerCode, and solveFlag in ${path}`);
-      }
-    }
-  });
-}
-
-function walkFiles(
-  dir: FSDir,
-  currentPath: string,
-  visit: (path: string, file: FSFile) => void,
-): void {
-  for (const [name, child] of Object.entries(dir.children)) {
-    const childPath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
-    if (child.type === 'file') {
-      visit(childPath, child);
-    } else {
-      walkFiles(child, childPath, visit);
-    }
-  }
+  const result = parseResourceHeader(headerPath, content);
+  assertNoResourceIssues(result.issues);
+  targetFile.header = result.header;
 }
 
 function buildRootFs(files: Record<string, string>): FSDir {
@@ -227,7 +127,7 @@ function buildRootFs(files: Record<string, string>): FSDir {
     addHeader(root, resourcePath, files[modulePath]);
   }
 
-  validateHeaders(root);
+  assertNoResourceIssues(validateResourceTree(root));
 
   return root;
 }

@@ -20,3 +20,12 @@ body {
 canvas {
   display: block;
 }
+
+.fatal-error {
+  min-height: 100%;
+  padding: 24px;
+  color: #ff6666;
+  background: #080c08;
+  font: 15px/1.5 "Courier New", Courier, monospace;
+  white-space: pre-wrap;
+}

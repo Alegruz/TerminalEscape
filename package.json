@@ -8,8 +8,9 @@
     "npm": ">=10"
   },
   "scripts": {
+    "validate:resources": "node scripts/validate-resources.mjs",
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run validate:resources && tsc && vite build",
     "preview": "vite preview"
   },
   "devDependencies": {
