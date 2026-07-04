@@ -1,6 +1,7 @@
 import type { ParsedCommand } from '../terminal/CommandParser.ts';
 import type { CommandContext, OutputLine } from '../terminal/CommandRegistry.ts';
 import { out } from '../terminal/CommandRegistry.ts';
+import { checkFileAccess } from '../fs/AccessControl.ts';
 
 /** Heuristic: is the text predominantly uppercase letters (Caesar-like)? */
 function looksLikeCaesar(text: string): boolean {
@@ -43,6 +44,14 @@ export function analyzeCommand(
     return [out(`analyze: ${cmd.args[0]}: is a directory`, 'error')];
   }
 
+  const access = checkFileAccess(state, vfs, target);
+  if (!access.allowed) {
+    return [
+      out(`analyze: ${target}: access denied`, 'error'),
+      out(access.reason, 'dim'),
+    ];
+  }
+
   const content = vfs.readFile(target) ?? '';
   const lines: OutputLine[] = [
     out(''),
@@ -67,9 +76,9 @@ export function analyzeCommand(
     lines.push(out('  Pattern   : all-caps, single-char substitution', 'dim'));
     lines.push(out(''));
     lines.push(out('  Recommendation:', 'bright'));
-    lines.push(out('    Likely Caesar / ROT13.  Try key 13 first:', 'normal'));
+    lines.push(out('    Likely Caesar-family substitution.', 'normal'));
     lines.push(
-      out(`    decrypt --method caesar --key 13 ${cmd.args[0]}`, 'system'),
+      out(`    decrypt --method caesar --key <number> ${cmd.args[0]}`, 'system'),
     );
   } else {
     lines.push(out('  Type      : plain text or unknown encoding', 'normal'));

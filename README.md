@@ -240,6 +240,10 @@ Supported fields:
 ```text
 accessFlag: navUnlocked
 accessDenied: authorization required by navigation subsystem
+repairFlag: navRepaired
+repairAlias: nav
+repairDenied: authorization required before repair routines can run
+repairComplete: true
 hidden: false
 ```
 

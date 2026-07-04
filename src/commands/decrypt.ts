@@ -1,6 +1,7 @@
 import type { ParsedCommand } from '../terminal/CommandParser.ts';
 import type { CommandContext, OutputLine } from '../terminal/CommandRegistry.ts';
 import { out } from '../terminal/CommandRegistry.ts';
+import { checkFileAccess } from '../fs/AccessControl.ts';
 
 export function decryptCommand(
   cmd: ParsedCommand,
@@ -48,6 +49,14 @@ export function decryptCommand(
   }
   if (nodeType === 'dir') {
     return [out(`decrypt: ${cmd.args[0]}: is a directory`, 'error')];
+  }
+
+  const access = checkFileAccess(state, vfs, target);
+  if (!access.allowed) {
+    return [
+      out(`decrypt: ${target}: access denied`, 'error'),
+      out(access.reason, 'dim'),
+    ];
   }
 
   const content = vfs.readFile(target) ?? '';

@@ -4,7 +4,7 @@ export interface PuzzleData {
   filePath: string;
   method: 'caesar';
   key: number;
-  /** The plaintext access code the player must submit to win. */
+  /** The plaintext access code the player must submit to unlock a system. */
   answerCode: string;
   solvedMessage: string[];
 }

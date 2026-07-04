@@ -1,6 +1,7 @@
 import type { ParsedCommand } from '../terminal/CommandParser.ts';
 import type { CommandContext, OutputLine } from '../terminal/CommandRegistry.ts';
 import { out } from '../terminal/CommandRegistry.ts';
+import { checkFileAccess } from '../fs/AccessControl.ts';
 
 export function catCommand(
   cmd: ParsedCommand,
@@ -22,11 +23,11 @@ export function catCommand(
     return [out(`cat: ${cmd.args[0]}: is a directory`, 'error')];
   }
 
-  const header = vfs.getFileHeader(target);
-  if (header?.accessFlag && !state.flags[header.accessFlag]) {
+  const access = checkFileAccess(state, vfs, target);
+  if (!access.allowed) {
     return [
       out(`cat: ${target}: access denied`, 'error'),
-      out(header.accessDenied ?? 'authorization required', 'dim'),
+      out(access.reason, 'dim'),
     ];
   }
 

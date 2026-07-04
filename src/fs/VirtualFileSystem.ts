@@ -63,9 +63,35 @@ export class VirtualFileSystem {
     return node.header ?? null;
   }
 
+  findFileByHeader(
+    predicate: (header: FSFileHeader, absolutePath: string) => boolean,
+  ): { path: string; header: FSFileHeader } | null {
+    return this.findFileByHeaderInDir('/', this.root, predicate);
+  }
+
   /** Return all absolute paths that start with `prefix` (for autocomplete). */
   listWithPrefix(absoluteDir: string, namePrefix: string): string[] {
     const names = this.listDir(absoluteDir) ?? [];
     return names.filter(n => n.startsWith(namePrefix));
+  }
+
+  private findFileByHeaderInDir(
+    currentPath: string,
+    dir: FSDir,
+    predicate: (header: FSFileHeader, absolutePath: string) => boolean,
+  ): { path: string; header: FSFileHeader } | null {
+    for (const [name, child] of Object.entries(dir.children)) {
+      const childPath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
+      if (child.type === 'file') {
+        if (child.header && predicate(child.header, childPath)) {
+          return { path: childPath, header: child.header };
+        }
+      } else {
+        const result = this.findFileByHeaderInDir(childPath, child, predicate);
+        if (result) return result;
+      }
+    }
+
+    return null;
   }
 }

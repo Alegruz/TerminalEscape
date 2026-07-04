@@ -2,8 +2,6 @@ import type { ParsedCommand } from '../terminal/CommandParser.ts';
 import type { CommandContext, OutputLine } from '../terminal/CommandRegistry.ts';
 import { out } from '../terminal/CommandRegistry.ts';
 
-const NAV_CORE_PATH = '/systems/nav_core.dat';
-
 const WIN_LINES: OutputLine[] = [
   out(''),
   out('╔════════════════════════════════════════════╗', 'bright'),
@@ -38,20 +36,35 @@ export function repairCommand(
     ];
   }
 
-  const target = vfs.resolve(state.currentPath, cmd.args[0]);
-  if (target !== NAV_CORE_PATH && cmd.args[0].toLowerCase() !== 'nav') {
-    return [out(`repair: ${cmd.args[0]}: unsupported repair target`, 'error')];
+  const requested = cmd.args[0];
+  const resolved = vfs.resolve(state.currentPath, requested);
+  const directHeader = vfs.getFileHeader(resolved);
+  const target = directHeader?.repairFlag
+    ? { path: resolved, header: directHeader }
+    : vfs.findFileByHeader((header) => header.repairAlias === requested.toLowerCase());
+
+  if (!target?.header.repairFlag) {
+    return [out(`repair: ${requested}: unsupported repair target`, 'error')];
   }
 
-  if (!state.flags.navUnlocked) {
+  if (target.header.accessFlag && !state.flags[target.header.accessFlag]) {
     return [
-      out('repair: navigation core access denied', 'error'),
-      out('authorization required before repair routines can run', 'dim'),
+      out(`repair: ${target.path}: access denied`, 'error'),
+      out(target.header.repairDenied ?? target.header.accessDenied ?? 'authorization required', 'dim'),
     ];
   }
 
-  state.flags.navRepaired = true;
-  state.flags.endingReached = true;
-  state.stage = 'complete';
-  return WIN_LINES;
+  state.flags[target.header.repairFlag] = true;
+
+  if (target.header.repairComplete) {
+    state.flags.endingReached = true;
+    state.stage = 'complete';
+    return WIN_LINES;
+  }
+
+  return [
+    out(''),
+    out(`[REPAIR COMPLETE] ${target.path}`, 'system'),
+    out(''),
+  ];
 }

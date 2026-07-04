@@ -11,12 +11,16 @@ export type FSDir = {
 
 export type FSNode = FSFile | FSDir;
 
-export type FSAccessFlag = 'navUnlocked';
+export type FSStateFlag = 'navUnlocked' | 'navRepaired';
 
 export type FSFileHeader = {
   hidden?: boolean;
-  accessFlag?: FSAccessFlag;
+  accessFlag?: FSStateFlag;
   accessDenied?: string;
+  repairFlag?: FSStateFlag;
+  repairAlias?: string;
+  repairDenied?: string;
+  repairComplete?: boolean;
 };
 
 const RESOURCE_ROOT = '../resources/filesystem/';
@@ -63,14 +67,26 @@ function parseHeader(content: string): FSFileHeader {
 
     if (key === 'hidden') {
       header.hidden = value === 'true';
-    } else if (key === 'accessFlag' && value === 'navUnlocked') {
+    } else if (key === 'accessFlag' && isStateFlag(value)) {
       header.accessFlag = value;
     } else if (key === 'accessDenied') {
       header.accessDenied = value;
+    } else if (key === 'repairFlag' && isStateFlag(value)) {
+      header.repairFlag = value;
+    } else if (key === 'repairAlias') {
+      header.repairAlias = value;
+    } else if (key === 'repairDenied') {
+      header.repairDenied = value;
+    } else if (key === 'repairComplete') {
+      header.repairComplete = value === 'true';
     }
   }
 
   return header;
+}
+
+function isStateFlag(value: string): value is FSStateFlag {
+  return value === 'navUnlocked' || value === 'navRepaired';
 }
 
 function findFile(root: FSDir, path: string): FSFile | null {
