@@ -1,7 +1,24 @@
 import type { GameState } from '../game/GameState.ts';
 import type { VirtualFileSystem } from '../fs/VirtualFileSystem.ts';
-import type { CommandRegistry } from './CommandRegistry.ts';
+import type {
+  CommandCompletionSpec,
+  CommandOptionSpec,
+  CommandRegistry,
+} from './CommandRegistry.ts';
 import { resolvePath } from '../fs/Path.ts';
+
+type CompletionResult = { completed: string } | { candidates: string[] } | null;
+
+const GLOBAL_OPTIONS: CommandOptionSpec[] = [
+  { name: '--help' },
+  { name: '-h' },
+];
+
+interface InputToken {
+  value: string;
+  start: number;
+  end: number;
+}
 
 /** Return the longest common prefix of an array of strings. */
 function commonPrefix(strings: string[]): string {
@@ -16,9 +33,34 @@ function commonPrefix(strings: string[]): string {
   return prefix;
 }
 
+function tokenizeInput(input: string): InputToken[] {
+  const tokens: InputToken[] = [];
+  const matches = input.matchAll(/\S+/g);
+
+  for (const match of matches) {
+    const value = match[0];
+    const start = match.index ?? 0;
+    tokens.push({ value, start, end: start + value.length });
+  }
+
+  if (/\s$/.test(input)) {
+    tokens.push({ value: '', start: input.length, end: input.length });
+  }
+
+  return tokens;
+}
+
+function replaceToken(input: string, token: InputToken, value: string): string {
+  return input.slice(0, token.start) + value + input.slice(token.end);
+}
+
+function appendSpace(value: string): string {
+  return value.endsWith(' ') ? value : `${value} `;
+}
+
 export class Autocomplete {
   /**
-   * Attempt to complete `input` based on available commands and VFS paths.
+   * Attempt to complete `input` based on command metadata and the VFS.
    *
    * Returns:
    *   { completed: string }         — a full or partial completion to replace input
@@ -30,36 +72,125 @@ export class Autocomplete {
     state: GameState,
     vfs: VirtualFileSystem,
     registry: CommandRegistry,
-  ): { completed: string } | { candidates: string[] } | null {
-    const tokens = input.trimStart().split(' ');
+  ): CompletionResult {
+    const tokens = tokenizeInput(input);
+    const current = tokens[tokens.length - 1] ?? { value: '', start: 0, end: 0 };
 
-    // Complete the command name when only one token is typed.
-    if (tokens.length === 1) {
-      return this.completeCommand(tokens[0], registry);
+    if (tokens.length <= 1) {
+      return this.completeCommand(input, current, registry);
     }
 
-    // Complete a path argument (last token).
-    const partial = tokens[tokens.length - 1];
-    const result = this.completePath(partial, state.currentPath, vfs);
-    if (!result) return null;
+    const commandName = registry.resolveName(tokens[0].value.toLowerCase());
+    if (!registry.hasCommand(commandName)) return null;
 
-    if ('candidates' in result) return result;
+    const spec = registry.getCompletionSpec(commandName);
+    const optionValue = this.findOptionAwaitingValue(tokens, current, spec);
+    if (optionValue) {
+      return this.completeOptionValue(input, current, optionValue);
+    }
 
-    // Rebuild the full input with the completed last token.
-    tokens[tokens.length - 1] = result.completed;
-    return { completed: tokens.join(' ') };
+    if (current.value.startsWith('-')) {
+      return this.completeOption(input, current, tokens, spec);
+    }
+
+    if (spec.args === 'command') {
+      return this.completeCommand(input, current, registry);
+    }
+
+    if (spec.args === 'path') {
+      return this.completePathToken(input, current, state.currentPath, vfs);
+    }
+
+    return null;
   }
 
   private completeCommand(
-    prefix: string,
+    input: string,
+    token: InputToken,
     registry: CommandRegistry,
-  ): { completed: string } | { candidates: string[] } | null {
+  ): CompletionResult {
+    const prefix = token.value.toLowerCase();
     const names = registry.getCommandNames().filter(n => n.startsWith(prefix));
-    if (names.length === 0) return null;
-    if (names.length === 1) return { completed: names[0] };
-    const cp = commonPrefix(names);
+    const result = this.completeFromCandidates(prefix, names, true);
+    if (!result || 'candidates' in result) return result;
+    return { completed: replaceToken(input, token, result.completed) };
+  }
+
+  private completeOption(
+    input: string,
+    token: InputToken,
+    tokens: InputToken[],
+    spec: CommandCompletionSpec,
+  ): CompletionResult {
+    const options = [...(spec.options ?? []), ...GLOBAL_OPTIONS];
+    const used = new Set(tokens.slice(1, -1).map(t => t.value));
+    const matches = options
+      .filter(option => !used.has(option.name))
+      .map(option => option.name)
+      .filter(name => name.startsWith(token.value));
+
+    const result = this.completeFromCandidates(token.value, matches, true);
+    if (!result || 'candidates' in result) return result;
+    return { completed: replaceToken(input, token, result.completed) };
+  }
+
+  private findOptionAwaitingValue(
+    tokens: InputToken[],
+    current: InputToken,
+    spec: CommandCompletionSpec,
+  ): CommandOptionSpec | null {
+    const options = spec.options ?? [];
+    if (tokens.length < 3) return null;
+
+    const previous = tokens[tokens.length - 2];
+    if (!previous || previous === current) return null;
+
+    const option = options.find(candidate => candidate.name === previous.value);
+    if (!option?.requiresValue) return null;
+
+    return option;
+  }
+
+  private completeOptionValue(
+    input: string,
+    token: InputToken,
+    option: CommandOptionSpec,
+  ): CompletionResult {
+    const values = option.values ?? [];
+    if (values.length === 0) return null;
+
+    const result = this.completeFromCandidates(token.value, values, true);
+    if (!result || 'candidates' in result) return result;
+    return { completed: replaceToken(input, token, result.completed) };
+  }
+
+  private completePathToken(
+    input: string,
+    token: InputToken,
+    cwd: string,
+    vfs: VirtualFileSystem,
+  ): CompletionResult {
+    const result = this.completePath(token.value, cwd, vfs);
+    if (!result) return null;
+    if ('candidates' in result) return result;
+    return { completed: replaceToken(input, token, result.completed) };
+  }
+
+  private completeFromCandidates(
+    prefix: string,
+    candidates: string[],
+    addSpaceOnSingle: boolean,
+  ): { completed: string } | { candidates: string[] } | null {
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) {
+      const completed = addSpaceOnSingle ? appendSpace(candidates[0]) : candidates[0];
+      return { completed };
+    }
+
+    const cp = commonPrefix(candidates);
     if (cp.length > prefix.length) return { completed: cp };
-    return { candidates: names };
+
+    return { candidates };
   }
 
   private completePath(
@@ -71,9 +202,8 @@ export class Autocomplete {
     let namePrefix: string;
 
     if (partial.includes('/')) {
-      // Split into directory part and name prefix.
       const lastSlash = partial.lastIndexOf('/');
-      const dirPart = partial.slice(0, lastSlash + 1); // includes trailing /
+      const dirPart = partial.slice(0, lastSlash + 1);
       namePrefix = partial.slice(lastSlash + 1);
       searchDir = resolvePath(cwd, dirPart);
     } else {
@@ -84,11 +214,15 @@ export class Autocomplete {
     const matches = vfs.listWithPrefix(searchDir, namePrefix);
     if (matches.length === 0) return null;
 
+    const displayMatches = matches.map(name => {
+      const fullPath = resolvePath(searchDir, name);
+      return vfs.isDir(fullPath) ? `${name}/` : name;
+    });
+
     if (matches.length === 1) {
       const name = matches[0];
       const fullPath = resolvePath(searchDir, name);
-      const suffix = vfs.isDir(fullPath) ? '/' : '';
-      // Rebuild the partial path with the completed name.
+      const suffix = vfs.isDir(fullPath) ? '/' : ' ';
       const completedPartial = partial.includes('/')
         ? partial.slice(0, partial.lastIndexOf('/') + 1) + name + suffix
         : name + suffix;
@@ -103,6 +237,6 @@ export class Autocomplete {
       return { completed: completedPartial };
     }
 
-    return { candidates: matches };
+    return { candidates: displayMatches };
   }
 }

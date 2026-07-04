@@ -1,6 +1,9 @@
 export class GameState {
   /** Lifecycle stage of the game. */
-  stage: 'boot' | 'play' | 'complete' = 'boot';
+  stage: 'boot' | 'play' | 'complete' | 'failed' = 'boot';
+
+  /** Epoch timestamp when the ship reaches the collision point. */
+  missionEndsAt: number | null = null;
 
   /** Current working directory (absolute path). */
   currentPath: string = '/';
@@ -15,7 +18,17 @@ export class GameState {
     emergencyDecrypted: false,
     navUnlocked: false,
     endingReached: false,
+    crashReached: false,
   };
+
+  startMissionTimer(durationMs: number, now = Date.now()): void {
+    this.missionEndsAt = now + durationMs;
+  }
+
+  getRemainingTimeMs(now = Date.now()): number | null {
+    if (this.missionEndsAt === null) return null;
+    return Math.max(0, this.missionEndsAt - now);
+  }
 
   // ── History helpers ──────────────────────────────────────────────────────────
 

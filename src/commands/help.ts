@@ -42,7 +42,7 @@ const COMMAND_HELP: Record<
     examples: ['clear'],
   },
   status: {
-    description: 'Show the current mission objective and suggested next step.',
+    description: 'Show current ship diagnostics.',
     usage: 'status',
     examples: ['status'],
   },

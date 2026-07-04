@@ -4,11 +4,11 @@ import {
   TextStyle,
   Graphics,
   Container,
+  CanvasTextMetrics,
 } from 'pixi.js';
 import { THEME, colorForType } from '../style/theme.ts';
 import type { BufferLine } from './TerminalBuffer.ts';
 
-const PROMPT = 'ARES-7$ ';
 /** Max visible text lines (excluding the input row). */
 const MAX_OUTPUT_LINES = 36;
 
@@ -16,6 +16,7 @@ export class TerminalRenderer {
   private app!: Application;
   private outputContainer!: Container;
   private outputTexts: Text[] = [];
+  private statusText!: Text;
   private inputText!: Text;
   private cursorGraphic!: Graphics;
   private scanlineGraphic!: Graphics;
@@ -33,6 +34,8 @@ export class TerminalRenderer {
   private lastLines: BufferLine[] = [];
   private lastInput = '';
   private lastCursorPos = -1;
+  private lastStatusLine = '';
+  private lastPrompt = '';
 
   async init(): Promise<void> {
     this.app = new Application();
@@ -84,6 +87,17 @@ export class TerminalRenderer {
       this.outputContainer.addChild(t);
       this.outputTexts.push(t);
     }
+
+    this.statusText = new Text({
+      text: '',
+      style: new TextStyle({
+        fontFamily: THEME.fontFamily,
+        fontSize: THEME.fontSize,
+        fill: THEME.textWarning,
+        letterSpacing: 0.5,
+      }),
+    });
+    this.app.stage.addChild(this.statusText);
 
     // Input / prompt line.
     this.inputText = new Text({
@@ -159,18 +173,24 @@ export class TerminalRenderer {
     inputValue: string,
     cursorPos: number,
     inputEnabled: boolean,
+    statusLine: string,
+    prompt: string,
   ): void {
     // Check for actual changes before marking dirty.
     const changed =
       visibleLines.length !== this.lastLines.length ||
       visibleLines.some((l, i) => l !== this.lastLines[i]) ||
       inputValue !== this.lastInput ||
-      cursorPos !== this.lastCursorPos;
+      cursorPos !== this.lastCursorPos ||
+      statusLine !== this.lastStatusLine ||
+      prompt !== this.lastPrompt;
 
     if (changed) {
       this.lastLines = visibleLines;
       this.lastInput = inputValue;
       this.lastCursorPos = cursorPos;
+      this.lastStatusLine = statusLine;
+      this.lastPrompt = prompt;
       this.markDirty();
     }
 
@@ -179,18 +199,24 @@ export class TerminalRenderer {
     this._pendingInput = inputValue;
     this._pendingCursorPos = cursorPos;
     this._pendingInputEnabled = inputEnabled;
+    this._pendingStatusLine = statusLine;
+    this._pendingPrompt = prompt;
   }
 
   private _pendingLines: BufferLine[] = [];
   private _pendingInput: string = '';
   private _pendingCursorPos: number = 0;
   private _pendingInputEnabled: boolean = false;
+  private _pendingStatusLine: string = '';
+  private _pendingPrompt: string = '';
 
   private repaint(): void {
     const lines = this._pendingLines;
     const inputValue = this._pendingInput;
     const cursorPos = this._pendingCursorPos;
     const inputEnabled = this._pendingInputEnabled;
+    const statusLine = this._pendingStatusLine;
+    const prompt = this._pendingPrompt;
 
     // Output lines.
     for (let i = 0; i < MAX_OUTPUT_LINES; i++) {
@@ -207,8 +233,13 @@ export class TerminalRenderer {
     // Input / prompt line at the bottom of the canvas.
     const inputY =
       this.app.screen.height - THEME.paddingBottom;
+    const statusY = inputY - THEME.lineHeight;
 
-    const promptText = inputEnabled ? PROMPT + inputValue : '';
+    this.statusText.text = statusLine;
+    this.statusText.x = THEME.paddingX;
+    this.statusText.y = statusY;
+
+    const promptText = inputEnabled ? prompt + inputValue : '';
     this.inputText.text = promptText;
     this.inputText.x = THEME.paddingX;
     this.inputText.y = inputY;
@@ -216,34 +247,30 @@ export class TerminalRenderer {
     // Cursor block.
     this.cursorGraphic.clear();
     if (inputEnabled && this.cursorVisible) {
-      const charWidth = this.getCharWidth();
-      const beforeCursor = PROMPT + inputValue.slice(0, cursorPos);
-      const cursorX = THEME.paddingX + beforeCursor.length * charWidth;
+      const beforeCursor = prompt + inputValue.slice(0, cursorPos);
+      const cursorWidth = this.getCursorWidth();
+      const cursorX = THEME.paddingX + this.measureInputTextWidth(beforeCursor);
       const cursorH = THEME.fontSize + 2;
       const cursorY = inputY + (THEME.lineHeight - cursorH) / 2;
       this.cursorGraphic
-        .rect(cursorX, cursorY, charWidth, cursorH)
+        .rect(cursorX, cursorY, cursorWidth, cursorH)
         .fill({ color: THEME.cursorColor, alpha: 0.9 });
     }
   }
 
-  private _charWidth: number | null = null;
+  private _cursorWidth: number | null = null;
 
-  private getCharWidth(): number {
-    if (this._charWidth === null) {
-      // Measure a single character using a temporary Text object.
-      const t = new Text({
-        text: 'M',
-        style: new TextStyle({
-          fontFamily: THEME.fontFamily,
-          fontSize: THEME.fontSize,
-          letterSpacing: 0.5,
-        }),
-      });
-      this._charWidth = t.width;
-      t.destroy();
+  private getCursorWidth(): number {
+    if (this._cursorWidth === null) {
+      this._cursorWidth = Math.ceil(this.measureInputTextWidth('M'));
     }
-    return this._charWidth;
+    return this._cursorWidth;
+  }
+
+  private measureInputTextWidth(text: string): number {
+    if (!text) return 0;
+    const metrics = CanvasTextMetrics.measureText(text, this.inputText.style as TextStyle);
+    return metrics.width;
   }
 
   // ── Boot helpers ─────────────────────────────────────────────────────────────

@@ -27,12 +27,29 @@ export type CommandHandler = (
   ctx: CommandContext,
 ) => OutputLine[];
 
+export interface CommandOptionSpec {
+  name: string;
+  values?: string[];
+  requiresValue?: boolean;
+}
+
+export interface CommandCompletionSpec {
+  args?: 'none' | 'path' | 'command';
+  options?: CommandOptionSpec[];
+}
+
 export class CommandRegistry {
   private readonly commands = new Map<string, CommandHandler>();
+  private readonly completions = new Map<string, CommandCompletionSpec>();
   private readonly aliases = new Map<string, string>();
 
-  register(name: string, handler: CommandHandler): void {
+  register(
+    name: string,
+    handler: CommandHandler,
+    completion: CommandCompletionSpec = {},
+  ): void {
     this.commands.set(name, handler);
+    this.completions.set(name, completion);
   }
 
   alias(aliasName: string, targetName: string): void {
@@ -74,6 +91,14 @@ export class CommandRegistry {
 
   getCommandNames(): string[] {
     return [...this.commands.keys()].sort();
+  }
+
+  resolveName(name: string): string {
+    return this.aliases.get(name) ?? name;
+  }
+
+  getCompletionSpec(name: string): CommandCompletionSpec {
+    return this.completions.get(this.resolveName(name)) ?? {};
   }
 
   hasCommand(name: string): boolean {

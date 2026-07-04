@@ -1,0 +1,13 @@
+NAVIGATION SYSTEM — ACCESS RESTRICTED
+======================================
+Status        : LOCKED
+Authorization : REQUIRED
+Impact timer  : ACTIVE
+
+To restore navigation, provide the access code:
+
+  submit <code>
+
+Diagnostic note:
+  Authorization material was captured in the emergency broadcast.
+  Cipher details can be derived from the emergency log.

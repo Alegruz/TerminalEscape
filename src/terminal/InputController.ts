@@ -133,6 +133,7 @@ export class InputController {
 
       case 'Tab': {
         e.preventDefault();
+        // Tab is a terminal control key here; it never inserts a literal tab.
         this.onTab(this._input);
         break;
       }

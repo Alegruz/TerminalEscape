@@ -10,93 +10,61 @@ export type FSDir = {
 
 export type FSNode = FSFile | FSDir;
 
-export const ROOT_FS: FSDir = {
-  type: 'dir',
-  children: {
-    'readme.txt': {
-      type: 'file',
-      content: `ARES-7 MAINTENANCE TERMINAL  v4.1.0
-====================================
-Ship status : CRITICAL
-Life support: NOMINAL
-Navigation  : OFFLINE
-Comms array : DAMAGED
+const RESOURCE_ROOT = '../resources/filesystem/';
 
-Multiple system failures detected after impact event.
+const resourceFiles = import.meta.glob<string>('../resources/filesystem/**/*', {
+  eager: true,
+  import: 'default',
+  query: '?raw',
+});
 
-RECOMMENDED ACTIONS:
-  1. Review emergency logs  ->  cd /logs
-  2. Analyze encrypted file ->  analyze emergency.enc
-  3. Decrypt transmission   ->  decrypt --method caesar --key ? emergency.enc
-  4. Restore navigation     ->  submit <access-code>
+function createDir(): FSDir {
+  return {
+    type: 'dir',
+    children: {},
+  };
+}
 
-Run 'status' at any time for current objectives.
-Run 'help' for a full list of commands.
-`,
-    },
-    logs: {
-      type: 'dir',
-      children: {
-        'crew_note.txt': {
-          type: 'file',
-          content: `Personal Log — Chief Engineer Vasquez
-Day 47.
+function getOrCreateDir(parent: FSDir, name: string): FSDir {
+  const existing = parent.children[name];
 
-The emergency broadcast encryption uses the default protocol.
-I always told Command that ROT13 is too simple, but protocol
-is protocol.  Key 13.  Caesar cipher.  That's it.
+  if (existing?.type === 'dir') return existing;
+  if (existing?.type === 'file') {
+    throw new Error(`Resource path conflict: ${name} is both a file and directory`);
+  }
 
-If you're reading this: decode the emergency log to retrieve
-the navigation unlock code.  Then use 'submit <code>'.
+  const dir = createDir();
+  parent.children[name] = dir;
+  return dir;
+}
 
-Good luck.
-— V
-`,
-        },
-        'emergency.enc': {
-          type: 'file',
-          content: `== RZRETRAPL OEBNQPNFG ==
-FUVC: NERF-7
-FGNGHF: PEVGVPNY SNVYHER
-ANIVTNGVBA FLFGRZ: BSSYVAR
-RFPNCR CBQ NPPRFF PBQR: ABIN-7734
-NHGUBEVMNGVBA: PZQ-PUVRS INFDHRM
+function addFile(root: FSDir, path: string, content: string): void {
+  const parts = path.split('/').filter(Boolean);
+  const fileName = parts.pop();
 
-NPGVBA ERDHVERQ: ERNPGVINGR ANIVTNGVBA
-RAGRE NPPRFF PBQR NG FLFGRZF GREZVANY
-`,
-        },
-      },
-    },
-    systems: {
-      type: 'dir',
-      children: {
-        'nav.locked': {
-          type: 'file',
-          content: `NAVIGATION SYSTEM — ACCESS RESTRICTED
-======================================
-Status        : LOCKED
-Authorization : REQUIRED
+  if (!fileName) return;
 
-To restore navigation, provide the access code:
+  let current = root;
+  for (const part of parts) {
+    current = getOrCreateDir(current, part);
+  }
 
-  submit <code>
+  current.children[fileName] = {
+    type: 'file',
+    content,
+  };
+}
 
-Hint: Decrypt /logs/emergency.enc to obtain the code.
-      Use 'analyze emergency.enc' for cipher details.
-`,
-        },
-        'nav_core.dat': {
-          type: 'file',
-          content: `[NAVIGATION CORE — RESTRICTED]
-Last known position : Sector 7, Grid 4-Alpha
-Destination         : Earth Station Meridian
-Original ETA        : 14 days
+function buildRootFs(files: Record<string, string>): FSDir {
+  const root = createDir();
+  const paths = Object.keys(files).sort();
 
-** AUTHORIZATION REQUIRED BEFORE ACCESS **
-`,
-        },
-      },
-    },
-  },
-};
+  for (const modulePath of paths) {
+    const resourcePath = modulePath.replace(RESOURCE_ROOT, '');
+    addFile(root, resourcePath, files[modulePath]);
+  }
+
+  return root;
+}
+
+export const ROOT_FS: FSDir = buildRootFs(resourceFiles);

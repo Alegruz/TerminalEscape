@@ -34,9 +34,18 @@ export class TerminalBuffer {
     return this.lines;
   }
 
-  /** Return the last `count` lines, or all lines if fewer exist. */
-  getVisibleLines(count: number): BufferLine[] {
-    const start = Math.max(0, this.lines.length - count);
-    return this.lines.slice(start);
+  get lineCount(): number {
+    return this.lines.length;
+  }
+
+  /**
+   * Return a visible window of lines.
+   * `offsetFromBottom` is 0 at the newest output, 1 one line higher, etc.
+   */
+  getVisibleLines(count: number, offsetFromBottom = 0): BufferLine[] {
+    const clampedOffset = Math.max(0, offsetFromBottom);
+    const end = Math.max(0, this.lines.length - clampedOffset);
+    const start = Math.max(0, end - count);
+    return this.lines.slice(start, end);
   }
 }

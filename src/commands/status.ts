@@ -1,46 +1,65 @@
 import type { ParsedCommand } from '../terminal/CommandParser.ts';
 import type { CommandContext, OutputLine } from '../terminal/CommandRegistry.ts';
 import { out } from '../terminal/CommandRegistry.ts';
+import {
+  SHIP_DIAGNOSTICS,
+  severityColor,
+  severityLabel,
+  stateLabel,
+} from '../data/diagnostics.ts';
 
 export function statusCommand(
   _cmd: ParsedCommand,
   ctx: CommandContext,
 ): OutputLine[] {
   const { state } = ctx;
+  const remainingMs = state.getRemainingTimeMs();
+  const remainingText = remainingMs === null ? 'UNKNOWN' : formatTime(remainingMs);
 
   const lines: OutputLine[] = [
     out(''),
     out('═══════════════════════════════════', 'dim'),
-    out(' ARES-7  MISSION STATUS', 'bright'),
+    out(' ARES-7  SYSTEM DIAGNOSTICS', 'bright'),
     out('═══════════════════════════════════', 'dim'),
     out(''),
   ];
 
   if (state.flags.endingReached) {
-    lines.push(out('  STATUS  : COMPLETE', 'bright'));
-    lines.push(out('  Navigation restored. Escape successful.', 'normal'));
+    lines.push(out('  IMPACT  : CLEARED', 'bright'));
+    lines.push(out('  NAV     : NOMINAL', 'system'));
     lines.push(out(''));
     return lines;
   }
 
-  if (state.flags.emergencyDecrypted) {
-    lines.push(out('  STATUS  : ACCESS CODE OBTAINED', 'bright'));
-    lines.push(out('  Objective: Submit the navigation unlock code.', 'normal'));
+  if (state.flags.crashReached) {
+    lines.push(out('  IMPACT  : EVENT RECORDED', 'error'));
+    lines.push(out('  SHIP    : LOST', 'error'));
     lines.push(out(''));
-    lines.push(out('  Next step:', 'dim'));
-    lines.push(out('    submit NOVA-7734', 'system'));
-    lines.push(out(''));
-  } else {
-    lines.push(out('  STATUS  : CRITICAL — NAVIGATION OFFLINE', 'warning'));
-    lines.push(out('  Objective: Decrypt the emergency broadcast.', 'normal'));
-    lines.push(out(''));
-    lines.push(out('  Next steps:', 'dim'));
-    lines.push(out('    1.  cd /logs', 'system'));
-    lines.push(out('    2.  cat crew_note.txt        (read hint)', 'system'));
-    lines.push(out('    3.  analyze emergency.enc    (cipher info)', 'system'));
-    lines.push(out('    4.  decrypt --method caesar --key 13 emergency.enc', 'system'));
-    lines.push(out(''));
+    return lines;
   }
 
+  lines.push(out(`  IMPACT  : ${remainingText}`, 'warning'));
+  lines.push(out(''));
+
+  for (const system of SHIP_DIAGNOSTICS.systems) {
+    const repaired = system.repairedWhen === null ? false : state.flags[system.repairedWhen];
+    const displayState = repaired ? 'NOMINAL' : stateLabel(system.state);
+    const displaySeverity = repaired ? 'INFO' : severityLabel(system.severity);
+    const color = repaired ? 'system' : severityColor(system.severity);
+
+    lines.push(out(`  ${displaySeverity.padEnd(5)} ${system.label.padEnd(14)} ${displayState}`, color));
+    if (!repaired && system.cause) {
+      lines.push(out(`        ${system.cause}`, 'dim'));
+    }
+  }
+  lines.push(out(''));
+
   return lines;
+}
+
+function formatTime(ms: number): string {
+  const totalSeconds = Math.ceil(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
