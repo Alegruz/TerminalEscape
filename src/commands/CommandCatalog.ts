@@ -9,6 +9,7 @@ export interface CommandHelpEntry {
 export interface CommandCatalogEntry extends CommandHelpEntry {
   name: string;
   completion: CommandCompletionSpec;
+  devOnly?: boolean;
 }
 
 export interface CommandAliasEntry {
@@ -152,7 +153,27 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
     examples: ['repair nav_core.dat', 'repair /systems/nav_core.dat'],
     completion: { args: 'path' },
   },
+  {
+    name: 'dev-fx',
+    description: 'Trigger terminal instability for renderer testing.',
+    usage: 'dev-fx [seconds] [intensity]',
+    examples: ['dev-fx', 'dev-fx 15 0.8'],
+    completion: { args: 'none' },
+    devOnly: true,
+  },
+  {
+    name: 'dev-speed',
+    description: 'Set the mission timer speed multiplier for testing.',
+    usage: 'dev-speed <multiplier>',
+    examples: ['dev-speed 8', 'dev-speed 1'],
+    completion: { args: 'none' },
+    devOnly: true,
+  },
 ];
+
+export function getVisibleCommandCatalog(): CommandCatalogEntry[] {
+  return COMMAND_CATALOG.filter(command => !command.devOnly);
+}
 
 export const COMMAND_ALIASES: CommandAliasEntry[] = [
   { alias: 'dir', target: 'ls' },
@@ -163,7 +184,7 @@ export const COMMAND_ALIASES: CommandAliasEntry[] = [
 
 export function getCommandHelp(name: string): CommandHelpEntry | null {
   const entry = COMMAND_CATALOG.find(command => command.name === name);
-  if (!entry) return null;
+  if (!entry || entry.devOnly) return null;
   return {
     description: entry.description,
     usage: entry.usage,

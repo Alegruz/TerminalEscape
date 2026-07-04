@@ -208,6 +208,7 @@ export class Game {
       this.inputController?.enabled  ?? false,
       this.buildLiveStatusLine(),
       this.buildPrompt(),
+      this.computeImpactInstability(),
     );
   }
 
@@ -219,6 +220,18 @@ export class Game {
 
   private buildPrompt(): string {
     return `ARES-7:${this.state.currentPath} $ `;
+  }
+
+  private computeImpactInstability(): number {
+    const devInstability = this.state.getDevInstability();
+    if (this.state.stage !== 'play') return 0;
+    if (this.state.flags.endingReached || this.state.flags.navRepaired) return devInstability;
+
+    const remainingMs = this.state.getRemainingTimeMs();
+    if (remainingMs === null || remainingMs > THEME.instabilityStartsMs) return devInstability;
+
+    const urgency = 1 - remainingMs / THEME.instabilityStartsMs;
+    return Math.max(devInstability, Math.min(1, Math.max(0, urgency)));
   }
 
   // ── Scrollback ───────────────────────────────────────────────────────────────

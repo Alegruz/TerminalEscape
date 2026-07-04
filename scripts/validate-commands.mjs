@@ -53,7 +53,8 @@ function parseAliases(source) {
 
 function parseHandlers(source) {
   const block = extractObjectBlock(source, 'HANDLERS');
-  return [...block.matchAll(/^\s*([a-z][a-z0-9-]*)\s*:/gm)].map(match => match[1]);
+  return [...block.matchAll(/^\s*(?:['"]([^'"]+)['"]|([a-z][a-z0-9-]*))\s*:/gm)]
+    .map(match => match[1] ?? match[2]);
 }
 
 function validateCatalog(entries, handlers, issueList) {

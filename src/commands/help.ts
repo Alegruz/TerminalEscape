@@ -1,7 +1,7 @@
 import type { ParsedCommand } from '../terminal/CommandParser.ts';
 import type { CommandContext, OutputLine } from '../terminal/CommandRegistry.ts';
 import { out } from '../terminal/CommandRegistry.ts';
-import { COMMAND_CATALOG, getCommandHelp } from './CommandCatalog.ts';
+import { getCommandHelp, getVisibleCommandCatalog } from './CommandCatalog.ts';
 
 export function helpCommand(
   cmd: ParsedCommand,
@@ -30,7 +30,7 @@ export function helpCommand(
     out('Available commands:', 'bright'),
     out(''),
   ];
-  for (const info of COMMAND_CATALOG) {
+  for (const info of getVisibleCommandCatalog()) {
     lines.push(out(`  ${info.name.padEnd(10)} ${info.description}`, 'normal'));
   }
   lines.push(out(''));

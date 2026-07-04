@@ -21,6 +21,10 @@ export class TerminalRenderer {
   private cursorGraphic!: Graphics;
   private scanlineGraphic!: Graphics;
   private borderGraphic!: Graphics;
+  private instability = 0;
+  private instabilityTimeMs = 0;
+  private glitchHoldMs = 0;
+  private lineJitter: number[] = Array(MAX_OUTPUT_LINES).fill(0);
 
   /** Controls cursor blink animation. */
   private cursorVisible = true;
@@ -161,6 +165,8 @@ export class TerminalRenderer {
       this.repaint();
       this.dirty = false;
     }
+
+    this.updateInstability(ticker.deltaMS);
   }
 
   markDirty(): void {
@@ -192,7 +198,9 @@ export class TerminalRenderer {
     inputEnabled: boolean,
     statusLine: string,
     prompt: string,
+    instability: number = 0,
   ): void {
+    const normalizedInstability = Math.min(1, Math.max(0, instability));
     // Check for actual changes before marking dirty.
     const changed =
       visibleLines.length !== this.lastLines.length ||
@@ -200,7 +208,8 @@ export class TerminalRenderer {
       inputValue !== this.lastInput ||
       cursorPos !== this.lastCursorPos ||
       statusLine !== this.lastStatusLine ||
-      prompt !== this.lastPrompt;
+      prompt !== this.lastPrompt ||
+      normalizedInstability !== this.instability;
 
     if (changed) {
       this.lastLines = visibleLines;
@@ -208,6 +217,7 @@ export class TerminalRenderer {
       this.lastCursorPos = cursorPos;
       this.lastStatusLine = statusLine;
       this.lastPrompt = prompt;
+      this.instability = normalizedInstability;
       this.markDirty();
     }
 
@@ -273,6 +283,81 @@ export class TerminalRenderer {
         .rect(cursorX, cursorY, cursorWidth, cursorH)
         .fill({ color: THEME.cursorColor, alpha: 0.9 });
     }
+  }
+
+  private updateInstability(deltaMs: number): void {
+    if (this.instability <= 0) {
+      this.resetInstabilityOffsets();
+      return;
+    }
+
+    this.instabilityTimeMs += deltaMs;
+    this.glitchHoldMs -= deltaMs;
+    if (this.glitchHoldMs <= 0) {
+      this.glitchHoldMs = 40 + Math.random() * Math.max(120, 220 - this.instability * 160);
+      this.refreshLineJitter();
+    }
+
+    const pulse = Math.sin(this.instabilityTimeMs * 0.045) * this.instability;
+    const shakeX = this.randomSigned(THEME.maxShakeX * this.instability) + pulse * 1.5;
+    const shakeY = this.randomSigned(THEME.maxShakeY * this.instability);
+    const textAlpha = 1 - Math.random() * THEME.textFlickerAlpha * this.instability;
+
+    this.outputContainer.x = shakeX;
+    this.outputContainer.y = shakeY;
+    this.outputContainer.alpha = textAlpha;
+
+    for (let i = 0; i < this.outputTexts.length; i++) {
+      const textObj = this.outputTexts[i];
+      textObj.x = THEME.paddingX + this.lineJitter[i] * this.instability;
+      textObj.y = THEME.paddingTop + i * THEME.lineHeight + this.randomSigned(0.4 * this.instability);
+    }
+
+    this.statusText.x = THEME.paddingX + shakeX + this.randomSigned(2 * this.instability);
+    this.inputText.x = THEME.paddingX + shakeX;
+    this.cursorGraphic.x = shakeX;
+    this.cursorGraphic.y = shakeY;
+    this.scanlineGraphic.alpha = 1 + Math.random() * THEME.scanlineFlickerAlpha * this.instability;
+    this.borderGraphic.alpha = 1 - Math.random() * THEME.borderFlickerAlpha * this.instability;
+  }
+
+  private refreshLineJitter(): void {
+    const chance = THEME.lineGlitchChance * this.instability;
+    for (let i = 0; i < this.lineJitter.length; i++) {
+      this.lineJitter[i] = Math.random() < chance
+        ? this.randomSigned(THEME.maxLineJitterX)
+        : 0;
+    }
+  }
+
+  private resetInstabilityOffsets(): void {
+    if (
+      this.outputContainer.x === 0 &&
+      this.outputContainer.y === 0 &&
+      this.outputContainer.alpha === 1 &&
+      this.scanlineGraphic.alpha === 1 &&
+      this.borderGraphic.alpha === 1
+    ) {
+      return;
+    }
+
+    this.outputContainer.x = 0;
+    this.outputContainer.y = 0;
+    this.outputContainer.alpha = 1;
+    for (let i = 0; i < this.outputTexts.length; i++) {
+      this.outputTexts[i].x = THEME.paddingX;
+      this.outputTexts[i].y = THEME.paddingTop + i * THEME.lineHeight;
+    }
+    this.statusText.x = THEME.paddingX;
+    this.inputText.x = THEME.paddingX;
+    this.cursorGraphic.x = 0;
+    this.cursorGraphic.y = 0;
+    this.scanlineGraphic.alpha = 1;
+    this.borderGraphic.alpha = 1;
+  }
+
+  private randomSigned(amount: number): number {
+    return (Math.random() * 2 - 1) * amount;
   }
 
   private _cursorWidth: number | null = null;

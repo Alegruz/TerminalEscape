@@ -42,14 +42,21 @@ export class CommandRegistry {
   private readonly commands = new Map<string, CommandHandler>();
   private readonly completions = new Map<string, CommandCompletionSpec>();
   private readonly aliases = new Map<string, string>();
+  private readonly hiddenCommands = new Set<string>();
 
   register(
     name: string,
     handler: CommandHandler,
     completion: CommandCompletionSpec = {},
+    options: { hidden?: boolean } = {},
   ): void {
     this.commands.set(name, handler);
     this.completions.set(name, completion);
+    if (options.hidden) {
+      this.hiddenCommands.add(name);
+    } else {
+      this.hiddenCommands.delete(name);
+    }
   }
 
   alias(aliasName: string, targetName: string): void {
@@ -90,7 +97,9 @@ export class CommandRegistry {
   }
 
   getCommandNames(): string[] {
-    return [...this.commands.keys()].sort();
+    return [...this.commands.keys()]
+      .filter(name => !this.hiddenCommands.has(name))
+      .sort();
   }
 
   resolveName(name: string): string {

@@ -4,6 +4,12 @@ export class GameState {
 
   /** Epoch timestamp when the ship reaches the collision point. */
   missionEndsAt: number | null = null;
+  missionTimerSpeed = 1;
+  private missionTimerUpdatedAt: number | null = null;
+  private missionRemainingAtUpdate: number | null = null;
+
+  devInstabilityUntil: number | null = null;
+  devInstabilityLevel = 0;
 
   /** Current working directory (absolute path). */
   currentPath: string = '/';
@@ -24,12 +30,42 @@ export class GameState {
   };
 
   startMissionTimer(durationMs: number, now = Date.now()): void {
+    this.missionTimerSpeed = 1;
+    this.missionTimerUpdatedAt = now;
+    this.missionRemainingAtUpdate = durationMs;
     this.missionEndsAt = now + durationMs;
   }
 
   getRemainingTimeMs(now = Date.now()): number | null {
-    if (this.missionEndsAt === null) return null;
-    return Math.max(0, this.missionEndsAt - now);
+    if (this.missionTimerUpdatedAt === null || this.missionRemainingAtUpdate === null) {
+      return null;
+    }
+    const elapsedMs = (now - this.missionTimerUpdatedAt) * this.missionTimerSpeed;
+    return Math.max(0, this.missionRemainingAtUpdate - elapsedMs);
+  }
+
+  setMissionTimerSpeed(speed: number, now = Date.now()): void {
+    const remainingMs = this.getRemainingTimeMs(now);
+    if (remainingMs === null) return;
+
+    this.missionTimerSpeed = speed;
+    this.missionTimerUpdatedAt = now;
+    this.missionRemainingAtUpdate = remainingMs;
+    this.missionEndsAt = speed > 0 ? now + remainingMs / speed : null;
+  }
+
+  triggerDevInstability(durationMs: number, level: number, now = Date.now()): void {
+    this.devInstabilityUntil = now + durationMs;
+    this.devInstabilityLevel = Math.min(1, Math.max(0, level));
+  }
+
+  getDevInstability(now = Date.now()): number {
+    if (this.devInstabilityUntil === null || now >= this.devInstabilityUntil) {
+      this.devInstabilityUntil = null;
+      this.devInstabilityLevel = 0;
+      return 0;
+    }
+    return this.devInstabilityLevel;
   }
 
   // ── History helpers ──────────────────────────────────────────────────────────

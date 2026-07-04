@@ -16,6 +16,7 @@ import { headCommand, tailCommand } from './head.ts';
 import { grepCommand } from './grep.ts';
 import { stringsCommand } from './strings.ts';
 import { scanCommand } from './scan.ts';
+import { devFxCommand, devSpeedCommand } from './dev.ts';
 
 const HANDLERS: Record<string, CommandHandler> = {
   help: helpCommand,
@@ -36,13 +37,18 @@ const HANDLERS: Record<string, CommandHandler> = {
   decrypt: decryptCommand,
   auth: authCommand,
   repair: repairCommand,
+  'dev-fx': devFxCommand,
+  'dev-speed': devSpeedCommand,
 };
 
 export function registerGameCommands(registry: CommandRegistry): void {
   validateCommandManifest();
 
   for (const command of COMMAND_CATALOG) {
-    registry.register(command.name, HANDLERS[command.name], command.completion);
+    if (command.devOnly && !import.meta.env.DEV) continue;
+    registry.register(command.name, HANDLERS[command.name], command.completion, {
+      hidden: command.devOnly,
+    });
   }
 
   for (const alias of COMMAND_ALIASES) {

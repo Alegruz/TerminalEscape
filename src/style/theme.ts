@@ -16,6 +16,14 @@ export const THEME = {
   paddingX: 20,
   paddingTop: 14,
   paddingBottom: 36,
+  instabilityStartsMs: 2 * 60 * 1000,
+  maxShakeX: 7,
+  maxShakeY: 3,
+  maxLineJitterX: 14,
+  lineGlitchChance: 0.38,
+  textFlickerAlpha: 0.22,
+  scanlineFlickerAlpha: 0.28,
+  borderFlickerAlpha: 0.35,
 } as const;
 
 export type TextColor =

@@ -667,6 +667,23 @@ completion: {
 Do not add `--help` or `-h` to command options. `CommandRegistry` provides both
 globally for every registered command.
 
+### Dev-only commands
+
+Commands can set `devOnly: true` in `COMMAND_CATALOG`. Dev-only commands are
+validated with the rest of the command manifest, but `CommandManifest` only
+registers them when `import.meta.env.DEV` is true. They are hidden commands:
+`help`, `help <command>`, and Tab completion must not reveal them.
+
+Current dev commands:
+
+| Command | Purpose |
+|---|---|
+| `dev-fx [seconds] [intensity]` | Trigger terminal shake/glitch rendering without waiting for the timer |
+| `dev-speed <multiplier>` | Speed up or slow down the mission timer for testing |
+
+Do not use dev-only commands for puzzle progression. They should exercise
+debugging hooks, renderer states, timers, and developer assertions only.
+
 ### Command validation
 
 `validateCommandManifest()` runs when commands are registered, and
