@@ -86,7 +86,7 @@ export class Autocomplete {
     const spec = registry.getCompletionSpec(commandName);
     const optionValue = this.findOptionAwaitingValue(tokens, current, spec);
     if (optionValue) {
-      return this.completeOptionValue(input, current, optionValue);
+      return this.completeOptionValue(input, current, optionValue, state, vfs);
     }
 
     if (current.value.startsWith('-')) {
@@ -155,7 +155,13 @@ export class Autocomplete {
     input: string,
     token: InputToken,
     option: CommandOptionSpec,
+    state: GameState,
+    vfs: VirtualFileSystem,
   ): CompletionResult {
+    if (option.valueCompletion === 'path') {
+      return this.completePathToken(input, token, state.currentPath, vfs);
+    }
+
     const values = option.values ?? [];
     if (values.length === 0) return null;
 

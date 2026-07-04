@@ -12,5 +12,5 @@ access is blocked until a valid authorization code is accepted.
 
 Diagnostic note:
   Authorization material was captured in the emergency broadcast.
-  After access is granted, inspect the core data and run the repair routine
-  against the damaged navigation component.
+  After access is granted, inspect the core package and isolate the damaged
+  navigation table before attempting repair.

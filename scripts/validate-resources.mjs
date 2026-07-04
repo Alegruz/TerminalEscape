@@ -16,6 +16,8 @@ const VALID_HEADER_FIELDS = new Set([
   'accessDenied',
   'repairFlag',
   'repairRequiresFlag',
+  'repairRequiresFile',
+  'repairPatchSignature',
   'repairAlias',
   'repairDenied',
   'repairComplete',
@@ -47,7 +49,7 @@ for (const file of files) {
   headers.push({ path: targetPath, header });
 }
 
-validateHeaders(headers, issues);
+validateHeaders(headers, resourcePaths, issues);
 
 if (issues.length > 0) {
   console.error('Resource validation failed:');
@@ -123,7 +125,7 @@ function parseHeader(headerPath, content, issueList) {
   return header;
 }
 
-function validateHeaders(headers, issueList) {
+function validateHeaders(headers, resourcePaths, issueList) {
   const repairAliases = new Map();
   const puzzleIds = new Map();
 
@@ -142,6 +144,17 @@ function validateHeaders(headers, issueList) {
     }
     if (header.repairRequiresFlag && !header.repairFlag) {
       issueList.push(`${targetPath}: repairRequiresFlag requires repairFlag`);
+    }
+    if (header.repairRequiresFile && !header.repairFlag) {
+      issueList.push(`${targetPath}: repairRequiresFile requires repairFlag`);
+    } else if (
+      header.repairRequiresFile &&
+      !resourcePaths.has(header.repairRequiresFile.replace(/^\/+/, ''))
+    ) {
+      issueList.push(`${targetPath}: repairRequiresFile target not found: ${header.repairRequiresFile}`);
+    }
+    if (header.repairPatchSignature && !header.repairRequiresFile) {
+      issueList.push(`${targetPath}: repairPatchSignature requires repairRequiresFile`);
     }
     if (header.scanMessage && !header.scanFlag) {
       issueList.push(`${targetPath}: scanMessage requires scanFlag`);

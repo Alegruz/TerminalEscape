@@ -1,0 +1,11 @@
+ARES-7 NAVIGATION PATCH PACKAGE
+===============================
+Package     : TRJ-CORR_A17.patch
+Target      : trajectory correction table
+Table       : TRJ-CORR/A17
+Signature   : PATCH-SIG:TRJ-CORR/A17
+
+Payload:
+  restore correction vector coefficients
+  rebuild checksum window
+  re-enable escape trajectory solver

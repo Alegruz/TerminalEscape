@@ -25,6 +25,8 @@ export type FSFileHeader = {
   accessDenied?: string;
   repairFlag?: FSStateFlag;
   repairRequiresFlag?: FSStateFlag;
+  repairRequiresFile?: string;
+  repairPatchSignature?: string;
   repairAlias?: string;
   repairDenied?: string;
   repairComplete?: boolean;

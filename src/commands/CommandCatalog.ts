@@ -149,9 +149,12 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
   {
     name: 'repair',
     description: 'Repair an unlocked damaged system component.',
-    usage: 'repair <target>',
-    examples: ['repair nav_core.dat', 'repair /systems/nav_core.dat'],
-    completion: { args: 'path' },
+    usage: 'repair <target> [--with <patch-file>]',
+    examples: ['repair nav_core.dat --with <patch-file>', 'repair /systems/nav_core.dat --with <patch-file>'],
+    completion: {
+      args: 'path',
+      options: [{ name: '--with', requiresValue: true, valueCompletion: 'path' }],
+    },
   },
   {
     name: 'dev-fx',

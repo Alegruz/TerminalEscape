@@ -31,6 +31,7 @@ export interface CommandOptionSpec {
   name: string;
   values?: string[];
   requiresValue?: boolean;
+  valueCompletion?: 'path';
 }
 
 export interface CommandCompletionSpec {

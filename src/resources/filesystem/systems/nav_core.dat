@@ -5,10 +5,11 @@ Destination         : Earth Station Meridian
 Original ETA        : 14 days
 
 Fault report:
-  nav_core trajectory checksum mismatch
+  module TRJ-CORR reports trajectory checksum mismatch
   autopilot correction table unavailable
-  escape vector cannot be calculated until core package is repaired
+  escape vector cannot be calculated until correction table is patched
 
-Repair target:
-  scan nav_core.dat
-  repair nav_core.dat
+Maintenance references:
+  patch registry : /patches/manifest.txt
+  expected table : TRJ-CORR/A17
+  recovery mode  : requires scanned fault isolation before patch application

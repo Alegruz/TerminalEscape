@@ -158,7 +158,7 @@ diagnostics, and command help to work out the recovery sequence.
 | `decrypt --method caesar --key N <file>` | Decrypt a Caesar-encoded file |
 | `auth <system> <code>` | Authenticate against a restricted subsystem |
 | `scan <target>` | Scan an unlocked component for repair faults |
-| `repair <target>` | Repair an unlocked damaged system component |
+| `repair <target> [--with <patch-file>]` | Repair an unlocked damaged system component |
 
 ### Navigation shortcuts
 
@@ -320,9 +320,11 @@ key: 13
 answerCode: EXAMPLE-CODE
 solveFlag: emergencyDecrypted
 scanFlag: navScanned
-scanMessage: checksum mismatch isolated in trajectory correction table
+scanMessage: TRJ-CORR/A17 checksum mismatch isolated; matching patch signature required
 repairFlag: navRepaired
 repairRequiresFlag: navScanned
+repairRequiresFile: /patches/TRJ-CORR_A17.patch
+repairPatchSignature: PATCH-SIG:TRJ-CORR/A17
 repairAlias: nav
 repairDenied: authorization required before repair routines can run
 repairComplete: true
@@ -389,9 +391,11 @@ accessDenied: authorization required by navigation subsystem
 
 ```text
 scanFlag: navScanned
-scanMessage: checksum mismatch isolated in trajectory correction table
+scanMessage: TRJ-CORR/A17 checksum mismatch isolated; matching patch signature required
 repairFlag: navRepaired
 repairRequiresFlag: navScanned
+repairRequiresFile: /patches/TRJ-CORR_A17.patch
+repairPatchSignature: PATCH-SIG:TRJ-CORR/A17
 repairAlias: nav
 repairDenied: authorization required before repair routines can run
 repairComplete: true

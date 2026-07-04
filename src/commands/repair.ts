@@ -31,7 +31,7 @@ export function repairCommand(
 
   if (cmd.args.length === 0) {
     return [
-      out('Usage: repair <target>', 'error'),
+      out('Usage: repair <target> [--with <patch-file>]', 'error'),
       out('repair target required', 'dim'),
     ];
   }
@@ -59,6 +59,41 @@ export function repairCommand(
       out(`repair: ${target.path}: precheck missing`, 'error'),
       out('scan target before running repair routines', 'dim'),
     ];
+  }
+
+  if (target.header.repairRequiresFile) {
+    const patchArg = cmd.flags['with'];
+    if (typeof patchArg !== 'string') {
+      return [
+        out(`repair: ${target.path}: patch source required`, 'error'),
+        out('scan output and maintenance notes identify the required patch package', 'dim'),
+      ];
+    }
+
+    const patchPath = vfs.resolve(state.currentPath, patchArg);
+    if (patchPath !== target.header.repairRequiresFile) {
+      return [
+        out(`repair: ${target.path}: patch rejected`, 'error'),
+        out('patch signature does not match damaged navigation table', 'dim'),
+      ];
+    }
+
+    const patchContent = vfs.readFile(patchPath);
+    if (patchContent === null) {
+      return [
+        out(`repair: ${patchPath}: no such patch file`, 'error'),
+      ];
+    }
+
+    if (
+      target.header.repairPatchSignature &&
+      !patchContent.includes(target.header.repairPatchSignature)
+    ) {
+      return [
+        out(`repair: ${patchPath}: patch integrity check failed`, 'error'),
+        out('signature mismatch', 'dim'),
+      ];
+    }
   }
 
   state.flags[target.header.repairFlag] = true;

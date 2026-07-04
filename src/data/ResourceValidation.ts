@@ -16,6 +16,8 @@ const VALID_HEADER_FIELDS = new Set([
   'accessDenied',
   'repairFlag',
   'repairRequiresFlag',
+  'repairRequiresFile',
+  'repairPatchSignature',
   'repairAlias',
   'repairDenied',
   'repairComplete',
@@ -83,6 +85,14 @@ export function validateResourceTree(root: FSDir): ResourceValidationIssue[] {
     if (header.repairRequiresFlag && !header.repairFlag) {
       issues.push({ path, message: 'repairRequiresFlag requires repairFlag' });
     }
+    if (header.repairRequiresFile && !header.repairFlag) {
+      issues.push({ path, message: 'repairRequiresFile requires repairFlag' });
+    } else if (header.repairRequiresFile && !findFile(root, header.repairRequiresFile)) {
+      issues.push({ path, message: `repairRequiresFile target not found: ${header.repairRequiresFile}` });
+    }
+    if (header.repairPatchSignature && !header.repairRequiresFile) {
+      issues.push({ path, message: 'repairPatchSignature requires repairRequiresFile' });
+    }
     if (header.scanMessage && !header.scanFlag) {
       issues.push({ path, message: 'scanMessage requires scanFlag' });
     }
@@ -110,6 +120,22 @@ export function validateResourceTree(root: FSDir): ResourceValidationIssue[] {
   });
 
   return issues;
+}
+
+function findFile(root: FSDir, absolutePath: string): FSFile | null {
+  const parts = absolutePath.split('/').filter(Boolean);
+  const fileName = parts.pop();
+  if (!fileName) return null;
+
+  let current = root;
+  for (const part of parts) {
+    const child = current.children[part];
+    if (!child || child.type !== 'dir') return null;
+    current = child;
+  }
+
+  const file = current.children[fileName];
+  return file?.type === 'file' ? file : null;
 }
 
 export function assertNoResourceIssues(issues: ResourceValidationIssue[]): void {
@@ -142,6 +168,10 @@ function applyHeaderField(
     header.repairFlag = parseStateFlag(path, key, value, issues);
   } else if (key === 'repairRequiresFlag') {
     header.repairRequiresFlag = parseStateFlag(path, key, value, issues);
+  } else if (key === 'repairRequiresFile') {
+    header.repairRequiresFile = value;
+  } else if (key === 'repairPatchSignature') {
+    header.repairPatchSignature = value;
   } else if (key === 'repairAlias') {
     header.repairAlias = value;
   } else if (key === 'repairDenied') {
