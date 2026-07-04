@@ -21,6 +21,7 @@ export class TerminalRenderer {
   private cursorGraphic!: Graphics;
   private scanlineGraphic!: Graphics;
   private borderGraphic!: Graphics;
+  private crashed = false;
   private instability = 0;
   private instabilityTimeMs = 0;
   private glitchHoldMs = 0;
@@ -200,6 +201,8 @@ export class TerminalRenderer {
     prompt: string,
     instability: number = 0,
   ): void {
+    if (this.crashed) return;
+
     const normalizedInstability = Math.min(1, Math.max(0, instability));
     // Check for actual changes before marking dirty.
     const changed =
@@ -360,6 +363,34 @@ export class TerminalRenderer {
     return (Math.random() * 2 - 1) * amount;
   }
 
+  crash(message: string): void {
+    if (this.crashed) return;
+
+    this.crashed = true;
+    this.app.ticker.stop();
+
+    const canvas = this.app.canvas;
+    const host = canvas.parentElement ?? document.getElementById('app') ?? document.body;
+    canvas.remove();
+
+    const crashPanel = document.createElement('pre');
+    crashPanel.textContent = message;
+    crashPanel.style.margin = '0';
+    crashPanel.style.padding = '24px';
+    crashPanel.style.width = '100vw';
+    crashPanel.style.height = '100vh';
+    crashPanel.style.boxSizing = 'border-box';
+    crashPanel.style.overflow = 'hidden';
+    crashPanel.style.background = '#120202';
+    crashPanel.style.color = '#ff3333';
+    crashPanel.style.fontFamily = THEME.fontFamily;
+    crashPanel.style.fontSize = `${THEME.fontSize}px`;
+    crashPanel.style.lineHeight = `${THEME.lineHeight}px`;
+    crashPanel.style.whiteSpace = 'pre-wrap';
+
+    host.replaceChildren(crashPanel);
+  }
+
   private _cursorWidth: number | null = null;
 
   private getCursorWidth(): number {
@@ -377,6 +408,6 @@ export class TerminalRenderer {
 
   // ── Boot helpers ─────────────────────────────────────────────────────────────
 
-  get screenWidth(): number  { return this.app.screen.width; }
-  get screenHeight(): number { return this.app.screen.height; }
+  get screenWidth(): number  { return this.crashed ? window.innerWidth : this.app.screen.width; }
+  get screenHeight(): number { return this.crashed ? window.innerHeight : this.app.screen.height; }
 }

@@ -55,6 +55,17 @@ const BOOT_LINES: BootLine[] = [
 ];
 
 const TIMER_TICK_MS = 1000;
+const CRASH_SHUTDOWN_DELAY_MS = 1200;
+const GAME_CRASH_MESSAGE = [
+  'KERNEL PANIC: ARES-7 MAINTENANCE TERMINAL',
+  '',
+  'IMPACT EVENT CONFIRMED',
+  'Primary bus offline.',
+  'Navigation correction window missed.',
+  'Telemetry stream lost.',
+  '',
+  'SYSTEM HALTED',
+].join('\n');
 
 // ── Game ─────────────────────────────────────────────────────────────────────
 
@@ -335,6 +346,13 @@ export class Game {
     }
 
     this.refreshDisplay();
+    window.setTimeout(() => this.crashGame(), CRASH_SHUTDOWN_DELAY_MS);
+  }
+
+  private crashGame(): void {
+    this.stopMissionTimer();
+    this.inputController.disable();
+    this.renderer.crash(GAME_CRASH_MESSAGE);
   }
 
   private formatTime(ms: number): string {
