@@ -43,13 +43,19 @@ export function statusCommand(
 
   for (const system of SHIP_DIAGNOSTICS.systems) {
     const repaired = system.repairedWhen === null ? false : state.flags[system.repairedWhen];
-    const displayState = repaired ? 'NOMINAL' : stateLabel(system.state);
+    const unlocked = state.flags.navUnlocked && system.unlockedState !== undefined;
+    const displayState = repaired
+      ? 'NOMINAL'
+      : unlocked
+        ? system.unlockedState
+        : stateLabel(system.state);
     const displaySeverity = repaired ? 'INFO' : severityLabel(system.severity);
     const color = repaired ? 'system' : severityColor(system.severity);
+    const cause = unlocked ? system.unlockedCause : system.cause;
 
     lines.push(out(`  ${displaySeverity.padEnd(5)} ${system.label.padEnd(14)} ${displayState}`, color));
-    if (!repaired && system.cause) {
-      lines.push(out(`        ${system.cause}`, 'dim'));
+    if (!repaired && cause) {
+      lines.push(out(`        ${cause}`, 'dim'));
     }
   }
   lines.push(out(''));

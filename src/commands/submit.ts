@@ -2,24 +2,13 @@ import type { ParsedCommand } from '../terminal/CommandParser.ts';
 import type { CommandContext, OutputLine } from '../terminal/CommandRegistry.ts';
 import { out } from '../terminal/CommandRegistry.ts';
 
-const WIN_LINES: OutputLine[] = [
+const ACCESS_GRANTED_LINES: OutputLine[] = [
   out(''),
-  out('╔════════════════════════════════════════════╗', 'bright'),
-  out('║        NAVIGATION RESTORED  ✓              ║', 'bright'),
-  out('╠════════════════════════════════════════════╣', 'bright'),
-  out('║                                            ║', 'bright'),
-  out('║   Authorization accepted.                  ║', 'system'),
-  out('║   Escape pod trajectory calculated.        ║', 'system'),
-  out('║   Autopilot engaged.                       ║', 'system'),
-  out('║                                            ║', 'bright'),
-  out('║   ETA to Earth Station Meridian: 14 days.  ║', 'normal'),
-  out('║                                            ║', 'bright'),
-  out('║          ★  YOU ESCAPED  ★                ║', 'bright'),
-  out('║                                            ║', 'bright'),
-  out('╚════════════════════════════════════════════╝', 'bright'),
+  out('[AUTHORIZATION ACCEPTED]', 'system'),
+  out('Navigation core access granted.', 'normal'),
+  out('Core checksum remains invalid. Repair required.', 'warning'),
   out(''),
-  out('  Thanks for playing Terminal Escape!', 'dim'),
-  out('  Refresh the page to play again.', 'dim'),
+  out('Inspect /systems/nav_core.dat for repair target details.', 'dim'),
   out(''),
 ];
 
@@ -32,7 +21,7 @@ export function submitCommand(
   if (cmd.args.length === 0) {
     return [
       out('Usage: submit <access-code>', 'error'),
-      out('Hint: Decrypt /logs/emergency.enc to find the code.', 'dim'),
+      out('authorization code required by navigation subsystem', 'dim'),
     ];
   }
 
@@ -41,9 +30,7 @@ export function submitCommand(
 
   if (puzzle) {
     state.flags.navUnlocked = true;
-    state.flags.endingReached = true;
-    state.stage = 'complete';
-    return WIN_LINES;
+    return ACCESS_GRANTED_LINES;
   }
 
   // Wrong code but puzzle not yet solved — give more direction.
@@ -52,7 +39,7 @@ export function submitCommand(
       out(`Authorization denied.  Code '${code}' is incorrect.`, 'error'),
       out(''),
       out('Have you decrypted the emergency log yet?', 'dim'),
-      out('  cd /logs  →  analyze emergency.enc  →  decrypt ...', 'dim'),
+      out('Emergency broadcast contents may contain authorization material.', 'dim'),
     ];
   }
 

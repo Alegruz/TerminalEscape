@@ -22,6 +22,14 @@ export function catCommand(
     return [out(`cat: ${cmd.args[0]}: is a directory`, 'error')];
   }
 
+  const header = vfs.getFileHeader(target);
+  if (header?.accessFlag && !state.flags[header.accessFlag]) {
+    return [
+      out(`cat: ${target}: access denied`, 'error'),
+      out(header.accessDenied ?? 'authorization required', 'dim'),
+    ];
+  }
+
   const content = vfs.readFile(target) ?? '';
   const lines: OutputLine[] = [out('')];
   for (const line of content.split('\n')) {

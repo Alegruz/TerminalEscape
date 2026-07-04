@@ -55,14 +55,19 @@ const COMMAND_HELP: Record<
     description: 'Decrypt an encrypted file using the specified cipher method.',
     usage: 'decrypt --method <method> --key <number> <file>',
     examples: [
-      'decrypt --method caesar --key 13 emergency.enc',
-      'decrypt --method caesar --key 3 /logs/emergency.enc',
+      'decrypt --method caesar --key <number> emergency.enc',
+      'decrypt --method caesar --key <number> /logs/emergency.enc',
     ],
   },
   submit: {
-    description: 'Submit an access code to restore navigation.',
+    description: 'Submit an access code to unlock a restricted system.',
     usage: 'submit <code>',
-    examples: ['submit NOVA-7734'],
+    examples: ['submit <code>'],
+  },
+  repair: {
+    description: 'Repair an unlocked damaged system component.',
+    usage: 'repair <target>',
+    examples: ['repair nav_core.dat', 'repair /systems/nav_core.dat'],
   },
 };
 

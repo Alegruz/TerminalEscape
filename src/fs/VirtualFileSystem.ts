@@ -1,5 +1,5 @@
 import { ROOT_FS } from '../data/filesystem.ts';
-import type { FSNode, FSDir, FSFile } from '../data/filesystem.ts';
+import type { FSNode, FSDir, FSFile, FSFileHeader } from '../data/filesystem.ts';
 import { normalizePath, resolvePath } from './Path.ts';
 
 export class VirtualFileSystem {
@@ -45,13 +45,22 @@ export class VirtualFileSystem {
   listDir(absolutePath: string): string[] | null {
     const node = this.getNode(absolutePath);
     if (!node || node.type !== 'dir') return null;
-    return Object.keys(node.children).sort();
+    return Object.entries(node.children)
+      .filter(([, child]) => child.type !== 'file' || child.header?.hidden !== true)
+      .map(([name]) => name)
+      .sort();
   }
 
   readFile(absolutePath: string): string | null {
     const node = this.getNode(absolutePath);
     if (!node || node.type !== 'file') return null;
     return (node as FSFile).content;
+  }
+
+  getFileHeader(absolutePath: string): FSFileHeader | null {
+    const node = this.getNode(absolutePath);
+    if (!node || node.type !== 'file') return null;
+    return node.header ?? null;
   }
 
   /** Return all absolute paths that start with `prefix` (for autocomplete). */

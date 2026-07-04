@@ -27,6 +27,7 @@ import { statusCommand }  from '../commands/status.ts';
 import { analyzeCommand } from '../commands/analyze.ts';
 import { decryptCommand } from '../commands/decrypt.ts';
 import { submitCommand }  from '../commands/submit.ts';
+import { repairCommand }  from '../commands/repair.ts';
 
 // ── Boot sequence lines ──────────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ export class Game {
       ],
     });
     this.registry.register('submit',  submitCommand, { args: 'none' });
+    this.registry.register('repair',  repairCommand, { args: 'path' });
   }
 
   // ── Boot sequence ────────────────────────────────────────────────────────────
@@ -376,7 +378,7 @@ export class Game {
     return `[ SYS ] ${blockingSystems || 'ALL NOMINAL'}    [ IMPACT ] ${remainingText}`;
   }
 
-  private isSystemRepaired(repairedWhen: 'navUnlocked' | null): boolean {
+  private isSystemRepaired(repairedWhen: 'navRepaired' | null): boolean {
     if (repairedWhen === null) return false;
     return this.state.flags[repairedWhen];
   }

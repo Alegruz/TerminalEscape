@@ -1,0 +1,4 @@
+# Resource sidecar metadata. Loaded by the VFS, hidden from players.
+accessFlag: navUnlocked
+accessDenied: authorization required by navigation subsystem
+hidden: false

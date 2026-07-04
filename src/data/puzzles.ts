@@ -21,7 +21,7 @@ export const PUZZLES: PuzzleData[] = [
       '[DECRYPTION SUCCESSFUL]',
       'Access code identified: NOVA-7734',
       '',
-      'Type  submit NOVA-7734  to restore navigation and escape.',
+      'Navigation authorization code recovered.',
       '',
     ],
   },

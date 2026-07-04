@@ -1,6 +1,7 @@
 export type FSFile = {
   type: 'file';
   content: string;
+  header?: FSFileHeader;
 };
 
 export type FSDir = {
@@ -10,7 +11,16 @@ export type FSDir = {
 
 export type FSNode = FSFile | FSDir;
 
+export type FSAccessFlag = 'navUnlocked';
+
+export type FSFileHeader = {
+  hidden?: boolean;
+  accessFlag?: FSAccessFlag;
+  accessDenied?: string;
+};
+
 const RESOURCE_ROOT = '../resources/filesystem/';
+const HEADER_SUFFIX = '.header';
 
 const resourceFiles = import.meta.glob<string>('../resources/filesystem/**/*', {
   eager: true,
@@ -38,6 +48,47 @@ function getOrCreateDir(parent: FSDir, name: string): FSDir {
   return dir;
 }
 
+function parseHeader(content: string): FSFileHeader {
+  const header: FSFileHeader = {};
+
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    const separatorIndex = line.indexOf(':');
+    if (separatorIndex === -1) continue;
+
+    const key = line.slice(0, separatorIndex).trim();
+    const value = line.slice(separatorIndex + 1).trim();
+
+    if (key === 'hidden') {
+      header.hidden = value === 'true';
+    } else if (key === 'accessFlag' && value === 'navUnlocked') {
+      header.accessFlag = value;
+    } else if (key === 'accessDenied') {
+      header.accessDenied = value;
+    }
+  }
+
+  return header;
+}
+
+function findFile(root: FSDir, path: string): FSFile | null {
+  const parts = path.split('/').filter(Boolean);
+  const fileName = parts.pop();
+  if (!fileName) return null;
+
+  let current = root;
+  for (const part of parts) {
+    const child = current.children[part];
+    if (!child || child.type !== 'dir') return null;
+    current = child;
+  }
+
+  const file = current.children[fileName];
+  return file?.type === 'file' ? file : null;
+}
+
 function addFile(root: FSDir, path: string, content: string): void {
   const parts = path.split('/').filter(Boolean);
   const fileName = parts.pop();
@@ -55,13 +106,30 @@ function addFile(root: FSDir, path: string, content: string): void {
   };
 }
 
+function addHeader(root: FSDir, headerPath: string, content: string): void {
+  const targetPath = headerPath.slice(0, -HEADER_SUFFIX.length);
+  const targetFile = findFile(root, targetPath);
+  if (!targetFile) {
+    throw new Error(`Header file has no target resource: ${headerPath}`);
+  }
+
+  targetFile.header = parseHeader(content);
+}
+
 function buildRootFs(files: Record<string, string>): FSDir {
   const root = createDir();
   const paths = Object.keys(files).sort();
 
   for (const modulePath of paths) {
     const resourcePath = modulePath.replace(RESOURCE_ROOT, '');
+    if (resourcePath.endsWith(HEADER_SUFFIX)) continue;
     addFile(root, resourcePath, files[modulePath]);
+  }
+
+  for (const modulePath of paths) {
+    const resourcePath = modulePath.replace(RESOURCE_ROOT, '');
+    if (!resourcePath.endsWith(HEADER_SUFFIX)) continue;
+    addHeader(root, resourcePath, files[modulePath]);
   }
 
   return root;

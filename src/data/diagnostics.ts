@@ -15,8 +15,10 @@ export interface ShipSystemDiagnostic {
   state: SystemState;
   severity: DiagnosticSeverity;
   cause: string;
+  unlockedState?: string;
+  unlockedCause?: string;
   blocksEscape: boolean;
-  repairedWhen: 'navUnlocked' | null;
+  repairedWhen: 'navRepaired' | null;
 }
 
 export interface TimerEvent {
@@ -43,8 +45,10 @@ export const SHIP_DIAGNOSTICS: ShipDiagnosticsConfig = {
       state: 'locked',
       severity: 'error',
       cause: 'authorization lockout after impact event',
+      unlockedState: 'REPAIR REQUIRED',
+      unlockedCause: 'authorization accepted; navigation core checksum invalid',
       blocksEscape: true,
-      repairedWhen: 'navUnlocked',
+      repairedWhen: 'navRepaired',
     },
     {
       id: 'trajectory',
@@ -53,8 +57,10 @@ export const SHIP_DIAGNOSTICS: ShipDiagnosticsConfig = {
       state: 'collision',
       severity: 'critical',
       cause: 'uncontrolled drift into debris field',
+      unlockedState: 'CORRECTION PENDING',
+      unlockedCause: 'navigation core repair required before course correction',
       blocksEscape: true,
-      repairedWhen: 'navUnlocked',
+      repairedWhen: 'navRepaired',
     },
     {
       id: 'comms',

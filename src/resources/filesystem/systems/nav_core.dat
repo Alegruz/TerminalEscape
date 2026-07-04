@@ -1,6 +1,13 @@
-[NAVIGATION CORE — RESTRICTED]
+[NAVIGATION CORE - AUTHORIZED ACCESS]
+Core package        : nav_core.dat
 Last known position : Sector 7, Grid 4-Alpha
 Destination         : Earth Station Meridian
 Original ETA        : 14 days
 
-** AUTHORIZATION REQUIRED BEFORE ACCESS **
+Fault report:
+  nav_core trajectory checksum mismatch
+  autopilot correction table unavailable
+  escape vector cannot be calculated until core package is repaired
+
+Repair target:
+  repair nav_core.dat

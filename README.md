@@ -123,19 +123,17 @@ Set the game frame to at least **900 × 540** pixels.
 Boot sequence plays automatically.  After boot, type commands at the prompt.
 The mission timer starts when the terminal becomes ready.
 
-### Quick walkthrough
+### First steps
 
 ```
 help                                       # list commands
 status                                     # current ship diagnostics
 ls                                         # list files
 cat readme.txt                             # read the readme
-cd logs                                    # enter logs directory
-cat crew_note.txt                          # read the hint
-analyze emergency.enc                      # identify the cipher
-decrypt --method caesar --key 13 emergency.enc   # decrypt it!
-submit NOVA-7734                           # restore navigation & escape
 ```
+
+The rest is intentionally not documented here. Use the in-game files,
+diagnostics, and command help to work out the recovery sequence.
 
 ### Implemented commands
 
@@ -151,7 +149,8 @@ submit NOVA-7734                           # restore navigation & escape
 | `status` | Show current ship diagnostics |
 | `analyze <file>` | Cipher analysis and recommendations |
 | `decrypt --method caesar --key N <file>` | Decrypt a Caesar-encoded file |
-| `submit <code>` | Submit the navigation access code |
+| `submit <code>` | Submit an access code to unlock a restricted system |
+| `repair <target>` | Repair an unlocked damaged system component |
 
 ### Navigation shortcuts
 
@@ -225,6 +224,25 @@ src/resources/filesystem/systems/nav.locked      -> /systems/nav.locked
 `src/data/filesystem.ts` loads that resource folder automatically during the Vite
 build, so no TypeScript changes are needed for ordinary file or directory additions.
 
+### File headers
+
+Add optional sidecar files next to resources for metadata that should be visible to
+developers but invisible to players:
+
+```text
+src/resources/filesystem/systems/nav_core.dat
+src/resources/filesystem/systems/nav_core.dat.header
+```
+
+Header files are loaded by the VFS and are not listed or autocompleted in-game.
+Supported fields:
+
+```text
+accessFlag: navUnlocked
+accessDenied: authorization required by navigation subsystem
+hidden: false
+```
+
 ## Adding new puzzles
 
 1. Add a new entry to `src/data/puzzles.ts`.
@@ -236,7 +254,7 @@ build, so no TypeScript changes are needed for ordinary file or directory additi
 
 ## Known limitations
 
-- Single timed puzzle (Caesar/ROT13) in the current vertical slice.
+- Single timed cryptography puzzle in the current vertical slice.
 - Scroll-back is limited to the terminal buffer history.
 - No sound effects.
 - Desktop browsers only (keyboard-first design).

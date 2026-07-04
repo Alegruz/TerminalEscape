@@ -1,13 +1,16 @@
-NAVIGATION SYSTEM — ACCESS RESTRICTED
-======================================
+NAVIGATION ACCESS GATE
+======================
+Subsystem     : NAVIGATION CORE
+Core file     : /systems/nav_core.dat
 Status        : LOCKED
 Authorization : REQUIRED
+Repair state  : PENDING
 Impact timer  : ACTIVE
 
-To restore navigation, provide the access code:
-
-  submit <code>
+The navigation core contains the damaged trajectory routines, but direct
+access is blocked until a valid authorization code is submitted.
 
 Diagnostic note:
   Authorization material was captured in the emergency broadcast.
-  Cipher details can be derived from the emergency log.
+  After access is granted, inspect the core data and run the repair routine
+  against the damaged navigation component.

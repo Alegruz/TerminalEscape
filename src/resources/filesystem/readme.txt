@@ -13,7 +13,8 @@ RECOMMENDED ACTIONS:
   1. Review emergency logs
   2. Analyze encrypted file
   3. Decrypt transmission
-  4. Restore navigation
+  4. Unlock navigation core access
+  5. Repair navigation core
 
 Run 'status' at any time for system diagnostics.
 Run 'help' for a full list of commands.
