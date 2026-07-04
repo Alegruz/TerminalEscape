@@ -9,8 +9,9 @@
   },
   "scripts": {
     "validate:resources": "node scripts/validate-resources.mjs",
+    "validate:commands": "node scripts/validate-commands.mjs",
     "dev": "vite",
-    "build": "npm run validate:resources && tsc && vite build",
+    "build": "npm run validate:resources && npm run validate:commands && tsc && vite build",
     "preview": "vite preview"
   },
   "devDependencies": {

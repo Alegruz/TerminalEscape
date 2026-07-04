@@ -101,6 +101,7 @@ No backend required — the entire game runs in the browser as a static HTML5 si
 ```bash
 npm run dev      # start the local dev server
 npm run validate:resources
+npm run validate:commands
 npm run build    # type-check and build production files into dist/
 npm run preview  # preview the production build locally
 ```
@@ -239,8 +240,8 @@ Startup flow:
    - `TerminalRenderer` for PixiJS drawing.
    - `CommandRegistry` for command dispatch.
    - `InputController` for keyboard input.
-3. `Game.registerCommands()` registers all terminal commands, aliases, completion
-   metadata, and option metadata.
+3. `Game.registerCommands()` calls the command manifest, which registers all
+   terminal commands, aliases, completion metadata, and option metadata.
 4. `Game.runBootSequence()` pushes boot lines into `TerminalBuffer` using timed
    `setTimeout` calls.
 5. When boot completes, the game enters `stage = 'play'`, enables input, starts
@@ -336,9 +337,9 @@ Run resource assertions directly with:
 npm run validate:resources
 ```
 
-`npm run build` runs the same validation before TypeScript and Vite. In the browser,
-resource assertion failures render a fatal developer screen instead of silently
-starting with broken content.
+`npm run build` runs resource and command validation before TypeScript and Vite.
+In the browser, resource assertion failures render a fatal developer screen
+instead of silently starting with broken content.
 
 ## Adding new puzzles
 
@@ -358,8 +359,8 @@ a completely new puzzle mechanic.
 | VFS behavior | `src/fs/VirtualFileSystem.ts`, `src/fs/AccessControl.ts` | File lookup, hidden headers, access checks |
 | Puzzle algorithms | `src/puzzles/crypto.ts`, `src/puzzles/PuzzleRegistry.ts` | Cipher/decoder/checking logic discovered from headers |
 | Commands | `src/commands/*.ts` | Player actions such as analyze, decrypt, auth, scan, repair |
-| Command routing | `Game.registerCommands()` | Command registration, aliases, autocomplete metadata |
-| Help/autocomplete | `src/commands/help.ts`, `src/terminal/Autocomplete.ts` | Player-facing command documentation and Tab behavior |
+| Command routing | `src/commands/CommandManifest.ts` | Command registration, handler binding, aliases, validation |
+| Help/autocomplete | `src/commands/CommandCatalog.ts`, `src/terminal/Autocomplete.ts` | Player-facing command documentation and Tab behavior |
 
 ### Add an instance of an existing puzzle type
 
@@ -407,13 +408,14 @@ repairComplete: true
    add completion/help metadata for any new command options.
 8. If the puzzle needs a new terminal command:
    - Add a handler in `src/commands/`.
-   - Register it in `Game.registerCommands()`.
-   - Add help text in [help.ts](src/commands/help.ts).
-   - Add completion metadata through `CommandRegistry.register(...)`.
+   - Add metadata in [CommandCatalog.ts](src/commands/CommandCatalog.ts).
+   - Bind the handler in [CommandManifest.ts](src/commands/CommandManifest.ts).
+   - Let help and autocomplete read from the catalog.
 9. Run:
 
 ```bash
 npm run validate:resources
+npm run validate:commands
 npm run build
 ```
 
@@ -485,8 +487,9 @@ Every new header field should have assertions. Examples:
 - Duplicate aliases, IDs, routes, or targets should fail validation.
 - Invalid enum values should produce an actionable error.
 
-Run `npm run validate:resources` while developing. Bad content should fail fast
-for developers, not become a silent player bug.
+Run `npm run validate:resources` and `npm run validate:commands` while
+developing. Bad content or command definitions should fail fast for developers,
+not become silent player bugs.
 
 5. Decide whether the mechanic belongs in an existing command or a new command.
 
@@ -517,9 +520,8 @@ When adding a command:
 - Create `src/commands/<name>.ts`.
 - Use `CommandContext` for `state`, `vfs`, `puzzles`, and `buffer`.
 - Return `OutputLine[]`; do not render directly.
-- Register it in `Game.registerCommands()`.
-- Add help text in `src/commands/help.ts`.
-- Add completion metadata in `CommandRegistry.register(...)`.
+- Add metadata in `src/commands/CommandCatalog.ts`.
+- Bind the handler in `src/commands/CommandManifest.ts`.
 - Reuse `checkFileAccess()` for file access restrictions.
 
 6. Add or extend puzzle algorithms.
@@ -559,10 +561,11 @@ resources instead.
 Before merging a new puzzle, check:
 
 - `npm run validate:resources` passes.
+- `npm run validate:commands` passes.
 - `npm run build` passes.
 - New headers have validation coverage.
 - New state flags are used by diagnostics or commands.
-- New commands have help and autocomplete.
+- New commands have catalog help and autocomplete metadata.
 - File access checks use `checkFileAccess()`.
 - README remains spoiler-free.
 - There is a playable path from discovery to resolution.
@@ -576,9 +579,124 @@ Before merging a new puzzle, check:
 | Add/validate header fields | `src/data/ResourceValidation.ts`, `src/data/filesystem.ts` |
 | Add player state | `src/game/GameState.ts` |
 | Change diagnostics/timer text | `src/data/diagnostics.ts` |
-| Add command behavior | `src/commands/`, then `Game.registerCommands()` |
-| Add command autocomplete | `CommandRegistry.register(..., completion)` |
+| Add command behavior | `src/commands/`, then `src/commands/CommandManifest.ts` |
+| Add command autocomplete | `src/commands/CommandCatalog.ts` |
 | Add cipher logic | `src/puzzles/crypto.ts`, `src/puzzles/PuzzleRegistry.ts` |
+
+## Adding new commands
+
+Commands are registered from one manifest so help text, autocomplete, aliases,
+and handlers cannot drift apart.
+
+Command system map:
+
+| Layer | File | Purpose |
+|---|---|---|
+| Handler implementation | `src/commands/<name>.ts` | Executes command behavior and returns `OutputLine[]` |
+| Command metadata | `src/commands/CommandCatalog.ts` | Name, description, usage, examples, completion metadata |
+| Handler binding | `src/commands/CommandManifest.ts` | Maps catalog names to handlers and validates command definitions |
+| Help output | `src/commands/help.ts` | Reads `COMMAND_CATALOG`; do not duplicate help text here |
+| Dispatch/runtime help | `src/terminal/CommandRegistry.ts` | Executes commands and handles global `--help` / `-h` |
+| Autocomplete | `src/terminal/Autocomplete.ts` | Uses completion metadata from the registry |
+| Registration call site | `Game.registerCommands()` | Calls `registerGameCommands(this.registry)` |
+
+### Command implementation checklist
+
+1. Create `src/commands/<name>.ts`.
+2. Export a function with this shape:
+
+```ts
+export function myCommand(
+  cmd: ParsedCommand,
+  ctx: CommandContext,
+): OutputLine[] {
+  return [];
+}
+```
+
+3. Use `CommandContext` instead of importing game singletons:
+   - `ctx.state` for progress flags/current path/history state.
+   - `ctx.vfs` for resolving, listing, and reading files.
+   - `ctx.puzzles` for puzzle checks/transforms.
+   - `ctx.buffer` only when the command needs direct buffer access.
+4. Return `OutputLine[]`; never call renderer APIs from a command.
+5. Use `out(text, color)` for command output.
+6. For file arguments:
+   - Resolve paths with `ctx.vfs.resolve(ctx.state.currentPath, input)`.
+   - Check type with `getNodeType()`.
+   - Use `checkFileAccess()` before reading restricted files.
+7. Add a `COMMAND_CATALOG` entry in `src/commands/CommandCatalog.ts`.
+8. Add the handler to `HANDLERS` in `src/commands/CommandManifest.ts`.
+9. Add aliases to `COMMAND_ALIASES` only if the alias should be valid input.
+10. Run `npm run build`.
+
+### Command catalog requirements
+
+Every command must define:
+
+```ts
+{
+  name: 'command-name',
+  description: 'Short help-list description.',
+  usage: 'command-name <arg>',
+  examples: ['command-name example'],
+  completion: { args: 'path' },
+}
+```
+
+Completion modes:
+
+| Mode | Use when |
+|---|---|
+| `none` | The command takes no path/command argument |
+| `path` | The command operates on files or directories |
+| `command` | The command takes another command name, like `help` |
+
+Options are declared in the same completion object:
+
+```ts
+completion: {
+  args: 'path',
+  options: [
+    { name: '--method', values: ['caesar'], requiresValue: true },
+    { name: '--key', requiresValue: true },
+  ],
+}
+```
+
+Do not add `--help` or `-h` to command options. `CommandRegistry` provides both
+globally for every registered command.
+
+### Command validation
+
+`validateCommandManifest()` runs when commands are registered, and
+`npm run validate:commands` runs the same command contract before a production
+build. Validation fails fast if:
+
+- A command name is duplicated.
+- A command name is not shell-safe lowercase.
+- A command is missing description, usage, examples, or completion metadata.
+- A catalog entry has no handler.
+- A handler has no catalog entry.
+- An alias conflicts with a command name.
+- An alias points to an unknown command.
+- A command tries to manually declare `--help` or `-h`.
+- The `help` command is missing.
+
+In development, these errors appear as a fatal browser assertion screen. During
+build, `scripts/validate-commands.mjs` catches catalog/manifest drift before
+TypeScript and Vite run.
+
+### Command design rules
+
+- Prefer general terminal verbs over game-specific verbs.
+- Keep command names short, lowercase, and shell-like.
+- Avoid hidden valid commands. If an alias is valid, document why it exists.
+- Keep generic help spoiler-free. Put puzzle clues in in-game files.
+- If a command changes game state, make that state explicit in `GameState.flags`.
+- If a command reads a file, respect VFS headers and access rules.
+- If a command needs autocomplete, express it through catalog metadata instead of
+  editing `Autocomplete.ts` directly.
 
 ## Working with rendering
 

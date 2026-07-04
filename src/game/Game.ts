@@ -16,24 +16,7 @@ import {
   severityLabel,
 } from '../data/diagnostics.ts';
 import type { FSStateFlag } from '../data/filesystem.ts';
-
-// Command handlers.
-import { helpCommand }    from '../commands/help.ts';
-import { lsCommand }      from '../commands/ls.ts';
-import { cdCommand }      from '../commands/cd.ts';
-import { pwdCommand }     from '../commands/pwd.ts';
-import { catCommand }     from '../commands/cat.ts';
-import { clearCommand }   from '../commands/clear.ts';
-import { statusCommand }  from '../commands/status.ts';
-import { analyzeCommand } from '../commands/analyze.ts';
-import { decryptCommand } from '../commands/decrypt.ts';
-import { authCommand }    from '../commands/auth.ts';
-import { repairCommand }  from '../commands/repair.ts';
-import { fileCommand }    from '../commands/file.ts';
-import { headCommand, tailCommand } from '../commands/head.ts';
-import { grepCommand }    from '../commands/grep.ts';
-import { stringsCommand } from '../commands/strings.ts';
-import { scanCommand }    from '../commands/scan.ts';
+import { registerGameCommands } from '../commands/CommandManifest.ts';
 
 // ── Boot sequence lines ──────────────────────────────────────────────────────
 
@@ -109,40 +92,7 @@ export class Game {
   // ── Command registration ─────────────────────────────────────────────────────
 
   private registerCommands(): void {
-    this.registry.register('help',    helpCommand, { args: 'command' });
-    this.registry.register('ls',      lsCommand,   { args: 'path' });
-    this.registry.register('cd',      cdCommand,   { args: 'path' });
-    this.registry.register('pwd',     pwdCommand,  { args: 'none' });
-    this.registry.register('cat',     catCommand,  { args: 'path' });
-    this.registry.register('open',    catCommand,  { args: 'path' });
-    this.registry.register('clear',   clearCommand, { args: 'none' });
-    this.registry.register('status',  statusCommand, { args: 'none' });
-    this.registry.register('analyze', analyzeCommand, { args: 'path' });
-    this.registry.register('file',    fileCommand, { args: 'path' });
-    this.registry.register('head',    headCommand, {
-      args: 'path',
-      options: [{ name: '-n', requiresValue: true }],
-    });
-    this.registry.register('tail',    tailCommand, {
-      args: 'path',
-      options: [{ name: '-n', requiresValue: true }],
-    });
-    this.registry.register('grep',    grepCommand, { args: 'path' });
-    this.registry.register('strings', stringsCommand, { args: 'path' });
-    this.registry.register('scan',    scanCommand, { args: 'path' });
-    this.registry.register('decrypt', decryptCommand, {
-      args: 'path',
-      options: [
-        { name: '--method', values: ['caesar'], requiresValue: true },
-        { name: '--key', requiresValue: true },
-      ],
-    });
-    this.registry.register('auth',    authCommand, { args: 'none' });
-    this.registry.register('repair',  repairCommand, { args: 'path' });
-    this.registry.alias('dir', 'ls');
-    this.registry.alias('type', 'cat');
-    this.registry.alias('more', 'cat');
-    this.registry.alias('unlock', 'auth');
+    registerGameCommands(this.registry);
   }
 
   // ── Boot sequence ────────────────────────────────────────────────────────────
