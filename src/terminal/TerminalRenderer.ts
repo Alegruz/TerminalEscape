@@ -36,6 +36,8 @@ export class TerminalRenderer {
   private lastCursorPos = -1;
   private lastStatusLine = '';
   private lastPrompt = '';
+  private lastScreenWidth = 0;
+  private lastScreenHeight = 0;
 
   async init(): Promise<void> {
     this.app = new Application();
@@ -51,14 +53,11 @@ export class TerminalRenderer {
     (appEl ?? document.body).appendChild(this.app.canvas);
 
     this.buildSceneGraph();
-    this.drawBorder();
-    this.buildScanlines();
+    this.refreshChrome();
 
     this.app.ticker.add(this.tick.bind(this));
     window.addEventListener('resize', () => {
-      this.drawBorder();
-      this.buildScanlines();
-      this.markDirty();
+      requestAnimationFrame(() => this.refreshChrome());
     });
   }
 
@@ -149,6 +148,8 @@ export class TerminalRenderer {
   // ── Update loop ──────────────────────────────────────────────────────────────
 
   private tick(ticker: { deltaMS: number }): void {
+    this.refreshChromeIfScreenChanged();
+
     this.cursorTimer += ticker.deltaMS;
     if (this.cursorTimer >= this.cursorBlinkMs) {
       this.cursorTimer = 0;
@@ -164,6 +165,22 @@ export class TerminalRenderer {
 
   markDirty(): void {
     this.dirty = true;
+  }
+
+  private refreshChromeIfScreenChanged(): void {
+    const width = this.app.screen.width;
+    const height = this.app.screen.height;
+    if (width === this.lastScreenWidth && height === this.lastScreenHeight) return;
+
+    this.refreshChrome();
+  }
+
+  private refreshChrome(): void {
+    this.lastScreenWidth = this.app.screen.width;
+    this.lastScreenHeight = this.app.screen.height;
+    this.drawBorder();
+    this.buildScanlines();
+    this.markDirty();
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
