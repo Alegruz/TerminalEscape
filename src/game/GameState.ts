@@ -17,6 +17,7 @@ export class GameState {
   flags = {
     emergencyDecrypted: false,
     navUnlocked: false,
+    navScanned: false,
     navRepaired: false,
     endingReached: false,
     crashReached: false,

@@ -12,39 +12,50 @@ const ACCESS_GRANTED_LINES: OutputLine[] = [
   out(''),
 ];
 
-export function submitCommand(
+export function authCommand(
   cmd: ParsedCommand,
   ctx: CommandContext,
 ): OutputLine[] {
   const { state, puzzles } = ctx;
 
-  if (cmd.args.length === 0) {
+  const { target, code } = parseAuthArgs(cmd);
+  if (!code) {
     return [
-      out('Usage: submit <access-code>', 'error'),
-      out('authorization code required by navigation subsystem', 'dim'),
+      out('Usage: auth <system> <access-code>', 'error'),
+      out('authorization code required by restricted subsystem', 'dim'),
     ];
   }
 
-  const code = cmd.args.join(' ');
-  const puzzle = puzzles.checkAnswer(code);
+  if (target !== 'nav' && target !== 'navigation') {
+    return [out(`auth: ${target}: unknown restricted subsystem`, 'error')];
+  }
 
+  const puzzle = puzzles.checkAnswer(code);
   if (puzzle) {
     state.flags.navUnlocked = true;
     return ACCESS_GRANTED_LINES;
   }
 
-  // Wrong code but puzzle not yet solved — give more direction.
   if (!state.flags.emergencyDecrypted) {
     return [
-      out(`Authorization denied.  Code '${code}' is incorrect.`, 'error'),
-      out(''),
-      out('Have you decrypted the emergency log yet?', 'dim'),
+      out('Authorization denied. Code is incorrect.', 'error'),
       out('Emergency broadcast contents may contain authorization material.', 'dim'),
     ];
   }
 
   return [
-    out(`Authorization denied.  Code '${code}' is incorrect.`, 'error'),
+    out('Authorization denied. Code is incorrect.', 'error'),
     out('Check the decrypted broadcast for the exact access code.', 'dim'),
   ];
+}
+
+function parseAuthArgs(cmd: ParsedCommand): { target: string; code: string } {
+  if (cmd.args.length === 1) {
+    return { target: 'nav', code: cmd.args[0] };
+  }
+
+  return {
+    target: (cmd.args[0] ?? 'nav').toLowerCase(),
+    code: cmd.args.slice(1).join(' '),
+  };
 }

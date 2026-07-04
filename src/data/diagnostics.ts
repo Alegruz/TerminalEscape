@@ -1,4 +1,5 @@
 import type { TextColor } from '../style/theme.ts';
+import type { FSStateFlag } from './filesystem.ts';
 
 export type DiagnosticSeverity = 'info' | 'warn' | 'error' | 'critical';
 export type SystemState = 'nominal' | 'degraded' | 'offline' | 'locked' | 'collision';
@@ -17,8 +18,9 @@ export interface ShipSystemDiagnostic {
   cause: string;
   unlockedState?: string;
   unlockedCause?: string;
+  unlockedWhen?: FSStateFlag;
   blocksEscape: boolean;
-  repairedWhen: 'navRepaired' | null;
+  repairedWhen: FSStateFlag | null;
 }
 
 export interface TimerEvent {
@@ -47,6 +49,7 @@ export const SHIP_DIAGNOSTICS: ShipDiagnosticsConfig = {
       cause: 'authorization lockout after impact event',
       unlockedState: 'REPAIR REQUIRED',
       unlockedCause: 'authorization accepted; navigation core checksum invalid',
+      unlockedWhen: 'navUnlocked',
       blocksEscape: true,
       repairedWhen: 'navRepaired',
     },
@@ -59,6 +62,7 @@ export const SHIP_DIAGNOSTICS: ShipDiagnosticsConfig = {
       cause: 'uncontrolled drift into debris field',
       unlockedState: 'CORRECTION PENDING',
       unlockedCause: 'navigation core repair required before course correction',
+      unlockedWhen: 'navUnlocked',
       blocksEscape: true,
       repairedWhen: 'navRepaired',
     },

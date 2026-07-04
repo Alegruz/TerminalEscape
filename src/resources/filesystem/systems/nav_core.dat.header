@@ -1,7 +1,10 @@
 # Resource sidecar metadata. Loaded by the VFS, hidden from players.
 accessFlag: navUnlocked
 accessDenied: authorization required by navigation subsystem
+scanFlag: navScanned
+scanMessage: checksum mismatch isolated in trajectory correction table
 repairFlag: navRepaired
+repairRequiresFlag: navScanned
 repairAlias: nav
 repairDenied: authorization required before repair routines can run
 repairComplete: true

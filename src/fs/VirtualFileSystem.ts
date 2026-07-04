@@ -69,6 +69,14 @@ export class VirtualFileSystem {
     return this.findFileByHeaderInDir('/', this.root, predicate);
   }
 
+  findFilesByHeader(
+    predicate: (header: FSFileHeader, absolutePath: string) => boolean,
+  ): Array<{ path: string; header: FSFileHeader }> {
+    const matches: Array<{ path: string; header: FSFileHeader }> = [];
+    this.findFilesByHeaderInDir('/', this.root, predicate, matches);
+    return matches;
+  }
+
   /** Return all absolute paths that start with `prefix` (for autocomplete). */
   listWithPrefix(absoluteDir: string, namePrefix: string): string[] {
     const names = this.listDir(absoluteDir) ?? [];
@@ -93,5 +101,23 @@ export class VirtualFileSystem {
     }
 
     return null;
+  }
+
+  private findFilesByHeaderInDir(
+    currentPath: string,
+    dir: FSDir,
+    predicate: (header: FSFileHeader, absolutePath: string) => boolean,
+    matches: Array<{ path: string; header: FSFileHeader }>,
+  ): void {
+    for (const [name, child] of Object.entries(dir.children)) {
+      const childPath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
+      if (child.type === 'file') {
+        if (child.header && predicate(child.header, childPath)) {
+          matches.push({ path: childPath, header: child.header });
+        }
+      } else {
+        this.findFilesByHeaderInDir(childPath, child, predicate, matches);
+      }
+    }
   }
 }

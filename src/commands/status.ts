@@ -43,7 +43,9 @@ export function statusCommand(
 
   for (const system of SHIP_DIAGNOSTICS.systems) {
     const repaired = system.repairedWhen === null ? false : state.flags[system.repairedWhen];
-    const unlocked = state.flags.navUnlocked && system.unlockedState !== undefined;
+    const unlocked = system.unlockedWhen !== undefined &&
+      state.flags[system.unlockedWhen] &&
+      system.unlockedState !== undefined;
     const displayState = repaired
       ? 'NOMINAL'
       : unlocked

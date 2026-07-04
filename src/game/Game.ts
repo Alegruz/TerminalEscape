@@ -15,6 +15,7 @@ import {
   severityColor,
   severityLabel,
 } from '../data/diagnostics.ts';
+import type { FSStateFlag } from '../data/filesystem.ts';
 
 // Command handlers.
 import { helpCommand }    from '../commands/help.ts';
@@ -26,8 +27,13 @@ import { clearCommand }   from '../commands/clear.ts';
 import { statusCommand }  from '../commands/status.ts';
 import { analyzeCommand } from '../commands/analyze.ts';
 import { decryptCommand } from '../commands/decrypt.ts';
-import { submitCommand }  from '../commands/submit.ts';
+import { authCommand }    from '../commands/auth.ts';
 import { repairCommand }  from '../commands/repair.ts';
+import { fileCommand }    from '../commands/file.ts';
+import { headCommand, tailCommand } from '../commands/head.ts';
+import { grepCommand }    from '../commands/grep.ts';
+import { stringsCommand } from '../commands/strings.ts';
+import { scanCommand }    from '../commands/scan.ts';
 
 // ── Boot sequence lines ──────────────────────────────────────────────────────
 
@@ -72,7 +78,7 @@ const TIMER_TICK_MS = 1000;
 export class Game {
   private readonly state      = new GameState();
   private readonly vfs        = new VirtualFileSystem();
-  private readonly puzzles    = new PuzzleRegistry();
+  private readonly puzzles    = new PuzzleRegistry(this.vfs);
   private readonly buffer     = new TerminalBuffer();
   private readonly renderer   = new TerminalRenderer();
   private readonly registry   = new CommandRegistry();
@@ -112,6 +118,18 @@ export class Game {
     this.registry.register('clear',   clearCommand, { args: 'none' });
     this.registry.register('status',  statusCommand, { args: 'none' });
     this.registry.register('analyze', analyzeCommand, { args: 'path' });
+    this.registry.register('file',    fileCommand, { args: 'path' });
+    this.registry.register('head',    headCommand, {
+      args: 'path',
+      options: [{ name: '-n', requiresValue: true }],
+    });
+    this.registry.register('tail',    tailCommand, {
+      args: 'path',
+      options: [{ name: '-n', requiresValue: true }],
+    });
+    this.registry.register('grep',    grepCommand, { args: 'path' });
+    this.registry.register('strings', stringsCommand, { args: 'path' });
+    this.registry.register('scan',    scanCommand, { args: 'path' });
     this.registry.register('decrypt', decryptCommand, {
       args: 'path',
       options: [
@@ -119,8 +137,12 @@ export class Game {
         { name: '--key', requiresValue: true },
       ],
     });
-    this.registry.register('submit',  submitCommand, { args: 'none' });
+    this.registry.register('auth',    authCommand, { args: 'none' });
     this.registry.register('repair',  repairCommand, { args: 'path' });
+    this.registry.alias('dir', 'ls');
+    this.registry.alias('type', 'cat');
+    this.registry.alias('more', 'cat');
+    this.registry.alias('unlock', 'auth');
   }
 
   // ── Boot sequence ────────────────────────────────────────────────────────────
@@ -360,12 +382,13 @@ export class Game {
   }
 
   private buildLiveStatusLine(): string {
+    const scrollText = this.scrollOffset > 0 ? `    [ SCROLL ] +${this.scrollOffset}` : '';
     if (this.state.stage === 'boot') return '';
     if (this.state.flags.endingReached) {
-      return '[ SYS ] NAV: NOMINAL    [ IMPACT ] CLEARED';
+      return `[ SYS ] NAV: NOMINAL    [ IMPACT ] CLEARED${scrollText}`;
     }
     if (this.state.flags.crashReached) {
-      return '[ SYS ] IMPACT EVENT    [ SHIP ] LOST';
+      return `[ SYS ] IMPACT EVENT    [ SHIP ] LOST${scrollText}`;
     }
 
     const remainingMs = this.state.getRemainingTimeMs();
@@ -375,10 +398,10 @@ export class Game {
       .map(system => `${severityLabel(system.severity)}:${system.id.toUpperCase()}`)
       .join(' ');
 
-    return `[ SYS ] ${blockingSystems || 'ALL NOMINAL'}    [ IMPACT ] ${remainingText}`;
+    return `[ SYS ] ${blockingSystems || 'ALL NOMINAL'}    [ IMPACT ] ${remainingText}${scrollText}`;
   }
 
-  private isSystemRepaired(repairedWhen: 'navRepaired' | null): boolean {
+  private isSystemRepaired(repairedWhen: FSStateFlag | null): boolean {
     if (repairedWhen === null) return false;
     return this.state.flags[repairedWhen];
   }

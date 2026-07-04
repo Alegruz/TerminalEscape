@@ -79,10 +79,11 @@ export function decryptCommand(
   // Check if this solves a puzzle.
   const solved = puzzles.checkSolve(target, methodStr, key);
   if (solved) {
-    state.flags.emergencyDecrypted = true;
-    for (const msg of solved.solvedMessage) {
-      lines.push(out(msg, 'system'));
-    }
+    state.flags[solved.solveFlag] = true;
+    lines.push(out(''));
+    lines.push(out('[DECRYPTION VERIFIED]', 'system'));
+    lines.push(out('Access material recovered from broadcast.', 'system'));
+    lines.push(out(''));
   }
 
   return lines;

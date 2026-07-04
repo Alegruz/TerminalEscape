@@ -46,6 +46,36 @@ const COMMAND_HELP: Record<
     usage: 'status',
     examples: ['status'],
   },
+  file: {
+    description: 'Identify a file or directory.',
+    usage: 'file <path>',
+    examples: ['file readme.txt', 'file /systems/nav_core.dat'],
+  },
+  head: {
+    description: 'Print the first lines of a file.',
+    usage: 'head [-n count] <file>',
+    examples: ['head readme.txt', 'head -n 5 /logs/crew_note.txt'],
+  },
+  tail: {
+    description: 'Print the last lines of a file.',
+    usage: 'tail [-n count] <file>',
+    examples: ['tail readme.txt', 'tail -n 5 /logs/crew_note.txt'],
+  },
+  grep: {
+    description: 'Search for text inside a file.',
+    usage: 'grep <pattern> <file>',
+    examples: ['grep status readme.txt', 'grep CORE /systems/nav.locked'],
+  },
+  strings: {
+    description: 'Print printable strings from a file.',
+    usage: 'strings <file>',
+    examples: ['strings /logs/emergency.enc'],
+  },
+  scan: {
+    description: 'Scan an unlocked component for repair faults.',
+    usage: 'scan <target>',
+    examples: ['scan nav_core.dat', 'scan /systems/nav_core.dat'],
+  },
   analyze: {
     description: 'Analyze a file and report encryption details.',
     usage: 'analyze <file>',
@@ -59,10 +89,10 @@ const COMMAND_HELP: Record<
       'decrypt --method caesar --key <number> /logs/emergency.enc',
     ],
   },
-  submit: {
-    description: 'Submit an access code to unlock a restricted system.',
-    usage: 'submit <code>',
-    examples: ['submit <code>'],
+  auth: {
+    description: 'Authenticate against a restricted subsystem.',
+    usage: 'auth <system> <access-code>',
+    examples: ['auth nav <code>'],
   },
   repair: {
     description: 'Repair an unlocked damaged system component.',

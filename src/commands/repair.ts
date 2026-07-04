@@ -54,6 +54,13 @@ export function repairCommand(
     ];
   }
 
+  if (target.header.repairRequiresFlag && !state.flags[target.header.repairRequiresFlag]) {
+    return [
+      out(`repair: ${target.path}: precheck missing`, 'error'),
+      out('scan target before running repair routines', 'dim'),
+    ];
+  }
+
   state.flags[target.header.repairFlag] = true;
 
   if (target.header.repairComplete) {

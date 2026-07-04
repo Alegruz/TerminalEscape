@@ -147,9 +147,15 @@ diagnostics, and command help to work out the recovery sequence.
 | `cat <file>` / `open <file>` | Display file contents |
 | `clear` | Clear the terminal |
 | `status` | Show current ship diagnostics |
+| `file <path>` | Identify a file or directory |
+| `head [-n count] <file>` | Print the first lines of a file |
+| `tail [-n count] <file>` | Print the last lines of a file |
+| `grep <pattern> <file>` | Search for text inside a file |
+| `strings <file>` | Print printable strings from a file |
 | `analyze <file>` | Cipher analysis and recommendations |
 | `decrypt --method caesar --key N <file>` | Decrypt a Caesar-encoded file |
-| `submit <code>` | Submit an access code to unlock a restricted system |
+| `auth <system> <code>` | Authenticate against a restricted subsystem |
+| `scan <target>` | Scan an unlocked component for repair faults |
 | `repair <target>` | Repair an unlocked damaged system component |
 
 ### Navigation shortcuts
@@ -176,7 +182,6 @@ src/
   data/
     filesystem.ts         Builds the virtual filesystem from resource files
     diagnostics.ts        Ship systems, timer events, and diagnostic text
-    puzzles.ts            Puzzle metadata (cipher type, key, answer)
   resources/
     filesystem/           In-game files mounted into the terminal
   game/
@@ -184,6 +189,7 @@ src/
     GameState.ts          Mutable game state (path, history, flags)
   fs/
     Path.ts               Path utilities (normalize, resolve, etc.)
+    AccessControl.ts      Shared file access checks
     VirtualFileSystem.ts  VFS wrapper around the data
   puzzles/
     crypto.ts             Caesar cipher implementation
@@ -203,9 +209,15 @@ src/
     cat.ts                cat / open
     clear.ts              clear
     status.ts             status
+    file.ts               file
+    head.ts               head / tail
+    grep.ts               grep
+    strings.ts            strings
     analyze.ts            analyze
     decrypt.ts            decrypt
-    submit.ts             submit
+    auth.ts               auth
+    scan.ts               scan
+    repair.ts             repair
 ```
 
 ---
@@ -240,7 +252,15 @@ Supported fields:
 ```text
 accessFlag: navUnlocked
 accessDenied: authorization required by navigation subsystem
+puzzleId: emergency_broadcast
+cipher: caesar
+key: 13
+answerCode: EXAMPLE-CODE
+solveFlag: emergencyDecrypted
+scanFlag: navScanned
+scanMessage: checksum mismatch isolated in trajectory correction table
 repairFlag: navRepaired
+repairRequiresFlag: navScanned
 repairAlias: nav
 repairDenied: authorization required before repair routines can run
 repairComplete: true
@@ -249,7 +269,7 @@ hidden: false
 
 ## Adding new puzzles
 
-1. Add a new entry to `src/data/puzzles.ts`.
+1. Add puzzle metadata to the encrypted file's `.header` sidecar.
 2. Implement any new cipher methods in `src/puzzles/crypto.ts`.
 3. Update `PuzzleRegistry.decrypt()` to dispatch to the new method.
 4. Update `src/data/diagnostics.ts` if a puzzle changes ship system state or failure timing.

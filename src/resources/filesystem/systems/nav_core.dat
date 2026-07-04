@@ -10,4 +10,5 @@ Fault report:
   escape vector cannot be calculated until core package is repaired
 
 Repair target:
+  scan nav_core.dat
   repair nav_core.dat

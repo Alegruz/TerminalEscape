@@ -8,7 +8,7 @@ Repair state  : PENDING
 Impact timer  : ACTIVE
 
 The navigation core contains the damaged trajectory routines, but direct
-access is blocked until a valid authorization code is submitted.
+access is blocked until a valid authorization code is accepted.
 
 Diagnostic note:
   Authorization material was captured in the emergency broadcast.
