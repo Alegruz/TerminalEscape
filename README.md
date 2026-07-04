@@ -223,6 +223,66 @@ src/
 
 ---
 
+## How the app works
+
+Terminal Escape is a static browser app with a small game loop around a terminal
+simulation.
+
+Startup flow:
+
+1. [main.ts](src/main.ts) creates `Game` and calls `game.init()`.
+2. [Game.ts](src/game/Game.ts) creates the core services:
+   - `GameState` for mutable progress flags, current path, history, and timer state.
+   - `VirtualFileSystem` for mounted resource files and sidecar headers.
+   - `PuzzleRegistry` for puzzle metadata discovered from file headers.
+   - `TerminalBuffer` for output history.
+   - `TerminalRenderer` for PixiJS drawing.
+   - `CommandRegistry` for command dispatch.
+   - `InputController` for keyboard input.
+3. `Game.registerCommands()` registers all terminal commands, aliases, completion
+   metadata, and option metadata.
+4. `Game.runBootSequence()` pushes boot lines into `TerminalBuffer` using timed
+   `setTimeout` calls.
+5. When boot completes, the game enters `stage = 'play'`, enables input, starts
+   the impact timer, and renders the live prompt.
+
+Input event flow:
+
+1. [InputController.ts](src/terminal/InputController.ts) listens to browser
+   `keydown` events.
+2. Printable keys edit the current input string. Enter sends the input to
+   `Game.onSubmit()`. Tab sends the input to `Game.onTab()`.
+3. `Game.onSubmit()` echoes the command, parses it with
+   [CommandParser.ts](src/terminal/CommandParser.ts), then dispatches through
+   [CommandRegistry.ts](src/terminal/CommandRegistry.ts).
+4. Command handlers in `src/commands/` receive `CommandContext`, mutate
+   `GameState` when needed, and return `OutputLine[]`.
+5. `Game` appends those output lines to `TerminalBuffer` and calls
+   `refreshDisplay()`.
+
+Render/timer flow:
+
+1. `Game.refreshDisplay()` selects a scrollback window from `TerminalBuffer`.
+2. It calls `TerminalRenderer.render(...)` with visible output, input text,
+   cursor position, live system status, and prompt text.
+3. [TerminalRenderer.ts](src/terminal/TerminalRenderer.ts) stores pending render
+   state. Its Pixi ticker repaints when dirty, blinks the cursor, and redraws
+   chrome when the screen size changes.
+4. The mission timer in `Game.updateMissionTimer()` runs every second while
+   `stage === 'play'`. It updates the live countdown, emits threshold diagnostic
+   events, and moves the game to `failed` if time reaches zero.
+
+Resource flow:
+
+1. [filesystem.ts](src/data/filesystem.ts) imports `src/resources/filesystem/**/*`
+   through Vite as raw text.
+2. Files ending in `.header` are parsed as developer metadata and attached to the
+   matching visible file.
+3. Header files are hidden from `ls`, autocomplete, and player file reads.
+4. [ResourceValidation.ts](src/data/ResourceValidation.ts) validates header
+   structure at runtime. `scripts/validate-resources.mjs` validates the same
+   resource folder before build.
+
 ## Adding new files / directories
 
 Add real files under `src/resources/filesystem/`. The folder structure maps directly
@@ -282,10 +342,294 @@ starting with broken content.
 
 ## Adding new puzzles
 
-1. Add puzzle metadata to the encrypted file's `.header` sidecar.
-2. Implement any new cipher methods in `src/puzzles/crypto.ts`.
-3. Update `PuzzleRegistry.decrypt()` to dispatch to the new method.
-4. Update `src/data/diagnostics.ts` if a puzzle changes ship system state or failure timing.
+Use this section when adding either a new instance of an existing puzzle type or
+a completely new puzzle mechanic.
+
+### Puzzle system map
+
+| Layer | Current files/classes | What belongs here |
+|---|---|---|
+| In-world content | `src/resources/filesystem/**` | Player-visible logs, encrypted files, modules, notes, patch data |
+| Hidden metadata | `*.header` sidecars | Access gates, puzzle IDs, solve flags, repair flags, scan metadata |
+| Header schema | `src/data/filesystem.ts` | TypeScript types for allowed metadata fields |
+| Header validation | `src/data/ResourceValidation.ts`, `scripts/validate-resources.mjs` | Developer assertions for bad metadata |
+| Player state | `src/game/GameState.ts` | Boolean progress flags and runtime state |
+| Diagnostics | `src/data/diagnostics.ts` | Ship system states, timer events, state-driven diagnostic text |
+| VFS behavior | `src/fs/VirtualFileSystem.ts`, `src/fs/AccessControl.ts` | File lookup, hidden headers, access checks |
+| Puzzle algorithms | `src/puzzles/crypto.ts`, `src/puzzles/PuzzleRegistry.ts` | Cipher/decoder/checking logic discovered from headers |
+| Commands | `src/commands/*.ts` | Player actions such as analyze, decrypt, auth, scan, repair |
+| Command routing | `Game.registerCommands()` | Command registration, aliases, autocomplete metadata |
+| Help/autocomplete | `src/commands/help.ts`, `src/terminal/Autocomplete.ts` | Player-facing command documentation and Tab behavior |
+
+### Add an instance of an existing puzzle type
+
+1. Add player-visible resource files under `src/resources/filesystem/`.
+   For example, add an encrypted file, notes, logs, broken modules, or patch files.
+2. Add a `.header` sidecar for metadata that should not be player-visible.
+   Puzzle headers currently support:
+
+```text
+puzzleId: unique_puzzle_id
+cipher: caesar
+key: 13
+answerCode: EXAMPLE-CODE
+solveFlag: emergencyDecrypted
+hidden: false
+```
+
+3. If the puzzle gates file access, add access metadata to the target file:
+
+```text
+accessFlag: navUnlocked
+accessDenied: authorization required by navigation subsystem
+```
+
+4. If the puzzle unlocks a repair step, add scan/repair metadata:
+
+```text
+scanFlag: navScanned
+scanMessage: checksum mismatch isolated in trajectory correction table
+repairFlag: navRepaired
+repairRequiresFlag: navScanned
+repairAlias: nav
+repairDenied: authorization required before repair routines can run
+repairComplete: true
+```
+
+5. Add any new state flags to:
+   - `FSStateFlag` in [filesystem.ts](src/data/filesystem.ts)
+   - `GameState.flags` in [GameState.ts](src/game/GameState.ts)
+6. If the puzzle affects ship diagnostics, update
+   [diagnostics.ts](src/data/diagnostics.ts). Use `unlockedWhen` and
+   `repairedWhen` to connect diagnostics to state flags.
+7. If the puzzle needs a new cipher, implement the algorithm in
+   [crypto.ts](src/puzzles/crypto.ts), update `PuzzleRegistry.decrypt()`, and
+   add completion/help metadata for any new command options.
+8. If the puzzle needs a new terminal command:
+   - Add a handler in `src/commands/`.
+   - Register it in `Game.registerCommands()`.
+   - Add help text in [help.ts](src/commands/help.ts).
+   - Add completion metadata through `CommandRegistry.register(...)`.
+9. Run:
+
+```bash
+npm run validate:resources
+npm run build
+```
+
+### Add a new puzzle mechanic
+
+Use this audit path when the puzzle is not just another Caesar-encrypted file.
+Examples: retrieving a password from several files, validating a checksum,
+assembling a patch from fragments, repairing a library/executable, routing power,
+or decoding a custom data format.
+
+1. Define the player action loop first.
+
+Write down the intended loop in terminal verbs:
+
+```text
+discover -> inspect -> transform/decode -> authenticate/unlock -> scan -> repair
+```
+
+Then decide whether existing commands can express it. Prefer reusing terminal
+verbs (`cat`, `file`, `strings`, `grep`, `analyze`, `auth`, `scan`, `repair`)
+before adding a new command.
+
+2. Audit whether the puzzle needs new state.
+
+Add a flag when the game must remember progress:
+
+```ts
+// src/game/GameState.ts
+flags = {
+  foundPassword: false,
+  decodedPayload: false,
+  modulePatched: false,
+};
+```
+
+Then add the same flag to `FSStateFlag` in `src/data/filesystem.ts` if headers
+need to reference it.
+
+3. Extend header metadata only when content needs to drive behavior.
+
+If designers should configure the puzzle from resources, add fields to:
+
+- `FSFileHeader` in `src/data/filesystem.ts`
+- `VALID_HEADER_FIELDS` and parsing in `src/data/ResourceValidation.ts`
+- `VALID_HEADER_FIELDS` and parsing in `scripts/validate-resources.mjs`
+- README header examples
+
+Examples of possible new metadata:
+
+```text
+passwordFlag: foundPassword
+passwordValue: <redacted or encoded value>
+patchRequiresFlag: decodedPayload
+patchOutputFlag: modulePatched
+checksum: 3F9A
+format: nav-patch-v1
+```
+
+Do not add metadata fields “just in case.” Add them when they remove hardcoded
+logic from commands or allow designers to author content safely.
+
+4. Add validation before adding gameplay logic.
+
+Every new header field should have assertions. Examples:
+
+- A `patchRequiresFlag` must reference a known state flag.
+- A `patchOutputFlag` must be present if `format: patch` is present.
+- A file that declares `passwordValue` must also declare `passwordFlag`.
+- Duplicate aliases, IDs, routes, or targets should fail validation.
+- Invalid enum values should produce an actionable error.
+
+Run `npm run validate:resources` while developing. Bad content should fail fast
+for developers, not become a silent player bug.
+
+5. Decide whether the mechanic belongs in an existing command or a new command.
+
+Use existing commands when the action is generic:
+
+| Mechanic | Usually belongs in |
+|---|---|
+| Read or inspect file text | `cat`, `head`, `tail`, `strings`, `grep` |
+| Identify file type or restrictions | `file` |
+| Detect cipher/data shape | `analyze` |
+| Decrypt/decode with method/key | `decrypt` or a new decoder command |
+| Authenticate with recovered material | `auth` |
+| Inspect damaged component | `scan` |
+| Apply final system fix | `repair` |
+
+Add a new command when the verb is materially different. For example:
+
+| New mechanic | Possible command |
+|---|---|
+| Assemble fragments | `assemble <output> <parts...>` |
+| Verify a checksum | `verify <file>` |
+| Apply a patch file | `patch <target> --with <file>` |
+| Mount a recovered archive | `mount <image>` |
+| Route power between systems | `route <source> <target>` |
+
+When adding a command:
+
+- Create `src/commands/<name>.ts`.
+- Use `CommandContext` for `state`, `vfs`, `puzzles`, and `buffer`.
+- Return `OutputLine[]`; do not render directly.
+- Register it in `Game.registerCommands()`.
+- Add help text in `src/commands/help.ts`.
+- Add completion metadata in `CommandRegistry.register(...)`.
+- Reuse `checkFileAccess()` for file access restrictions.
+
+6. Add or extend puzzle algorithms.
+
+For cryptography/data transforms:
+
+- Put pure algorithms in `src/puzzles/crypto.ts` or a new focused file under
+  `src/puzzles/`.
+- Keep command parsing and terminal output in `src/commands/`.
+- Keep puzzle discovery/checking in `PuzzleRegistry`.
+
+If a new cipher is configured from headers:
+
+- Extend `FSFileHeader.cipher`.
+- Validate the new cipher value in both validators.
+- Extend `PuzzleRegistry.decrypt()`.
+- Update command autocomplete for `decrypt --method`.
+- Update `analyze` only if it can reasonably detect the new format.
+
+7. Connect the mechanic to diagnostics.
+
+If the puzzle repairs or changes the ship:
+
+- Add or update systems in `src/data/diagnostics.ts`.
+- Use `unlockedWhen` for intermediate access states.
+- Use `repairedWhen` for final fixed states.
+- Add timer events only if the system should affect urgency.
+
+8. Keep player-facing docs spoiler-free.
+
+Do not put exact answers, keys, solved command chains, or access codes in
+`README.md` or generic command help. Put discoverable information in in-game
+resources instead.
+
+9. Build the audit checklist into the PR/review.
+
+Before merging a new puzzle, check:
+
+- `npm run validate:resources` passes.
+- `npm run build` passes.
+- New headers have validation coverage.
+- New state flags are used by diagnostics or commands.
+- New commands have help and autocomplete.
+- File access checks use `checkFileAccess()`.
+- README remains spoiler-free.
+- There is a playable path from discovery to resolution.
+
+### Puzzle ownership quick reference
+
+| Need | Work in |
+|---|---|
+| Add readable/in-world files | `src/resources/filesystem/` |
+| Add hidden metadata | `*.header` sidecar |
+| Add/validate header fields | `src/data/ResourceValidation.ts`, `src/data/filesystem.ts` |
+| Add player state | `src/game/GameState.ts` |
+| Change diagnostics/timer text | `src/data/diagnostics.ts` |
+| Add command behavior | `src/commands/`, then `Game.registerCommands()` |
+| Add command autocomplete | `CommandRegistry.register(..., completion)` |
+| Add cipher logic | `src/puzzles/crypto.ts`, `src/puzzles/PuzzleRegistry.ts` |
+
+## Working with rendering
+
+Rendering is intentionally isolated from game logic. Most renderer changes should
+stay inside [TerminalRenderer.ts](src/terminal/TerminalRenderer.ts) and
+[theme.ts](src/style/theme.ts).
+
+Renderer responsibilities:
+
+| Responsibility | File/class/function |
+|---|---|
+| Create Pixi app and canvas | `TerminalRenderer.init()` |
+| Build display objects | `TerminalRenderer.buildSceneGraph()` |
+| Draw border/chrome | `drawBorder()`, `refreshChrome()` |
+| Draw scanlines/vignette | `buildScanlines()` |
+| Store pending render state | `render(...)` |
+| Paint text/cursor | `repaint()` |
+| Cursor blink and resize polling | `tick(...)` |
+| Text colors, spacing, padding | `src/style/theme.ts` |
+| Body/canvas/fatal-error CSS | `src/style.css` |
+
+Rules of thumb:
+
+- Do not read or mutate `GameState` from the renderer. Pass render-ready strings
+  and lines from `Game.refreshDisplay()`.
+- Keep Pixi display objects persistent. Create them once in `buildSceneGraph()`
+  and update their text/position in `repaint()`.
+- Use `markDirty()` after any renderer state changes. The Pixi ticker performs
+  the actual repaint.
+- For resize-sensitive chrome, update through `refreshChrome()`. It is called
+  after browser resize and when the Pixi screen size changes in `tick()`.
+- The input prompt and live system row are fixed at the bottom. Only
+  `TerminalBuffer` output scrolls.
+- Cursor X position uses `CanvasTextMetrics.measureText(...)`; avoid returning
+  to character-count math unless all text rendering is truly fixed-width.
+- Add new colors to `theme.ts` and `colorForType()` before using new
+  `TextColor` values.
+- Keep renderer code presentation-only. If behavior depends on commands,
+  puzzles, file access, or diagnostics, implement it in `Game`, `commands`,
+  `VirtualFileSystem`, or data modules first.
+
+Rendering change checklist:
+
+1. Identify whether the change is style, layout, chrome, input, or output.
+2. Update `theme.ts` for colors/sizes, `TerminalRenderer.ts` for Pixi objects,
+   or `style.css` for page-level CSS.
+3. Test resize/minimize/restore behavior when touching border, scanlines, or
+   layout.
+4. Test long command input and cursor placement when touching prompt or text
+   measurement.
+5. Run `npm run build`.
 
 ---
 
