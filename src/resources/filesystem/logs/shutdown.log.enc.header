@@ -1,0 +1,6 @@
+puzzleId: shutdown-log
+cipher: caesar
+key: 13
+answerCode: PERHAPS
+solveFlag: logDecrypted
+hidden: false

@@ -18,6 +18,6 @@ export function checkFileAccess(
 
   return {
     allowed: false,
-    reason: header.accessDenied ?? 'authorization required',
+    reason: header.accessDenied ?? 'root permission required',
   };
 }

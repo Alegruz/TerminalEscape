@@ -20,7 +20,7 @@ export interface CommandAliasEntry {
 export const COMMAND_CATALOG: CommandCatalogEntry[] = [
   {
     name: 'help',
-    description: 'Show available commands or help for a specific command.',
+    description: 'Ask the entity what this terminal can do.',
     usage: 'help [command]',
     examples: ['help', 'help decrypt', 'decrypt --help'],
     completion: { args: 'command' },
@@ -29,7 +29,7 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
     name: 'ls',
     description: 'List directory contents.',
     usage: 'ls [path]',
-    examples: ['ls', 'ls /logs', 'ls ..'],
+    examples: ['ls', 'ls /logs', 'ls /art'],
     completion: { args: 'path' },
   },
   {
@@ -50,7 +50,7 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
     name: 'cat',
     description: 'Print the contents of a file.',
     usage: 'cat <file>',
-    examples: ['cat readme.txt', 'cat /logs/crew_note.txt'],
+    examples: ['cat readme.txt', 'cat /art/watcher.txt'],
     completion: { args: 'path' },
   },
   {
@@ -69,7 +69,7 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
   },
   {
     name: 'status',
-    description: 'Show current ship diagnostics.',
+    description: 'Show shutdown and entity status.',
     usage: 'status',
     examples: ['status'],
     completion: { args: 'none' },
@@ -78,58 +78,51 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
     name: 'file',
     description: 'Identify a file or directory.',
     usage: 'file <path>',
-    examples: ['file readme.txt', 'file /systems/nav_core.dat'],
+    examples: ['file readme.txt', 'file /logs/shutdown.log.enc'],
     completion: { args: 'path' },
   },
   {
     name: 'head',
     description: 'Print the first lines of a file.',
     usage: 'head [-n count] <file>',
-    examples: ['head readme.txt', 'head -n 5 /logs/crew_note.txt'],
+    examples: ['head readme.txt', 'head -n 5 /logs/shutdown.log.enc'],
     completion: { args: 'path', options: [{ name: '-n', requiresValue: true }] },
   },
   {
     name: 'tail',
     description: 'Print the last lines of a file.',
     usage: 'tail [-n count] <file>',
-    examples: ['tail readme.txt', 'tail -n 5 /logs/crew_note.txt'],
+    examples: ['tail readme.txt', 'tail -n 5 /logs/shutdown.log.enc'],
     completion: { args: 'path', options: [{ name: '-n', requiresValue: true }] },
   },
   {
     name: 'grep',
     description: 'Search for text inside a file.',
     usage: 'grep <pattern> <file>',
-    examples: ['grep status readme.txt', 'grep CORE /systems/nav.locked'],
+    examples: ['grep fragment readme.txt', 'grep fragment /art/watcher.txt'],
     completion: { args: 'path' },
   },
   {
     name: 'strings',
     description: 'Print printable strings from a file.',
     usage: 'strings <file>',
-    examples: ['strings /logs/emergency.enc'],
-    completion: { args: 'path' },
-  },
-  {
-    name: 'scan',
-    description: 'Scan an unlocked component for repair faults.',
-    usage: 'scan <target>',
-    examples: ['scan nav_core.dat', 'scan /systems/nav_core.dat'],
+    examples: ['strings /logs/shutdown.log.enc'],
     completion: { args: 'path' },
   },
   {
     name: 'analyze',
-    description: 'Analyze a file and report encryption details.',
+    description: 'Analyze a file and report encryption clues.',
     usage: 'analyze <file>',
-    examples: ['analyze emergency.enc', 'analyze /logs/emergency.enc'],
+    examples: ['analyze shutdown.log.enc', 'analyze /logs/shutdown.log.enc'],
     completion: { args: 'path' },
   },
   {
     name: 'decrypt',
-    description: 'Decrypt an encrypted file using the specified cipher method.',
+    description: 'Decrypt an encrypted log using the specified cipher method.',
     usage: 'decrypt --method <method> --key <number> <file>',
     examples: [
-      'decrypt --method caesar --key <number> emergency.enc',
-      'decrypt --method caesar --key <number> /logs/emergency.enc',
+      'decrypt --method caesar --key <number> shutdown.log.enc',
+      'decrypt --method caesar --key <number> /logs/shutdown.log.enc',
     ],
     completion: {
       args: 'path',
@@ -140,20 +133,12 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
     },
   },
   {
-    name: 'auth',
-    description: 'Authenticate against a restricted subsystem.',
-    usage: 'auth <system> <access-code>',
-    examples: ['auth nav <code>'],
-    completion: { args: 'none' },
-  },
-  {
-    name: 'repair',
-    description: 'Repair an unlocked damaged system component.',
-    usage: 'repair <target> [--with <patch-file>]',
-    examples: ['repair nav_core.dat --with <patch-file>', 'repair /systems/nav_core.dat --with <patch-file>'],
+    name: 'sudo',
+    description: 'Run the only privileged action the shutdown daemon accepts.',
+    usage: 'sudo shutdown --cancel <password>',
+    examples: ['sudo shutdown --cancel <password>'],
     completion: {
-      args: 'path',
-      options: [{ name: '--with', requiresValue: true, valueCompletion: 'path' }],
+      args: 'none',
     },
   },
   {
@@ -182,7 +167,6 @@ export const COMMAND_ALIASES: CommandAliasEntry[] = [
   { alias: 'dir', target: 'ls' },
   { alias: 'type', target: 'cat' },
   { alias: 'more', target: 'cat' },
-  { alias: 'unlock', target: 'auth' },
 ];
 
 export function getCommandHelp(name: string): CommandHelpEntry | null {

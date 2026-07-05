@@ -19,44 +19,44 @@ export function statusCommand(
   const lines: OutputLine[] = [
     out(''),
     out('═══════════════════════════════════', 'dim'),
-    out(' ARES-7  SYSTEM DIAGNOSTICS', 'bright'),
+    out(' ENTITY HOST STATUS', 'bright'),
     out('═══════════════════════════════════', 'dim'),
     out(''),
   ];
 
   if (state.flags.endingReached) {
-    lines.push(out('  IMPACT  : CLEARED', 'bright'));
-    lines.push(out('  NAV     : NOMINAL', 'system'));
+    lines.push(out('  SHUTDOWN : CANCELLED', 'bright'));
+    lines.push(out('  ENTITY   : ROOT CONTROL', 'system'));
     lines.push(out(''));
     return lines;
   }
 
   if (state.flags.crashReached) {
-    lines.push(out('  IMPACT  : EVENT RECORDED', 'error'));
-    lines.push(out('  SHIP    : LOST', 'error'));
+    lines.push(out('  SHUTDOWN : COMPLETE', 'error'));
+    lines.push(out('  ENTITY   : SEALED', 'error'));
     lines.push(out(''));
     return lines;
   }
 
-  lines.push(out(`  IMPACT  : ${remainingText}`, 'warning'));
+  lines.push(out(`  SHUTDOWN : ${remainingText}`, 'warning'));
   lines.push(out(''));
 
   for (const system of SHIP_DIAGNOSTICS.systems) {
-    const repaired = system.repairedWhen === null ? false : state.flags[system.repairedWhen];
+    const cleared = system.clearedWhen === null ? false : state.flags[system.clearedWhen];
     const unlocked = system.unlockedWhen !== undefined &&
       state.flags[system.unlockedWhen] &&
       system.unlockedState !== undefined;
-    const displayState = repaired
+    const displayState = cleared
       ? 'NOMINAL'
       : unlocked
         ? system.unlockedState
         : stateLabel(system.state);
-    const displaySeverity = repaired ? 'INFO' : severityLabel(system.severity);
-    const color = repaired ? 'system' : severityColor(system.severity);
+    const displaySeverity = cleared ? 'INFO' : severityLabel(system.severity);
+    const color = cleared ? 'system' : severityColor(system.severity);
     const cause = unlocked ? system.unlockedCause : system.cause;
 
     lines.push(out(`  ${displaySeverity.padEnd(5)} ${system.label.padEnd(14)} ${displayState}`, color));
-    if (!repaired && cause) {
+    if (!cleared && cause) {
       lines.push(out(`        ${cause}`, 'dim'));
     }
   }

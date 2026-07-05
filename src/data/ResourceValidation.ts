@@ -14,15 +14,6 @@ const VALID_HEADER_FIELDS = new Set([
   'hidden',
   'accessFlag',
   'accessDenied',
-  'repairFlag',
-  'repairRequiresFlag',
-  'repairRequiresFile',
-  'repairPatchSignature',
-  'repairAlias',
-  'repairDenied',
-  'repairComplete',
-  'scanFlag',
-  'scanMessage',
   'puzzleId',
   'cipher',
   'key',
@@ -60,42 +51,11 @@ export function parseResourceHeader(path: string, content: string): ResourceHead
 
 export function validateResourceTree(root: FSDir): ResourceValidationIssue[] {
   const issues: ResourceValidationIssue[] = [];
-  const repairAliases = new Map<string, string>();
   const puzzleIds = new Map<string, string>();
 
   walkFiles(root, '/', (path, file) => {
     const header = file.header;
     if (!header) return;
-
-    if (header.repairAlias) {
-      const existingPath = repairAliases.get(header.repairAlias);
-      if (existingPath) {
-        issues.push({
-          path,
-          message: `Duplicate repairAlias '${header.repairAlias}' already used by ${existingPath}`,
-        });
-      } else {
-        repairAliases.set(header.repairAlias, path);
-      }
-    }
-
-    if (header.repairComplete && !header.repairFlag) {
-      issues.push({ path, message: 'repairComplete requires repairFlag' });
-    }
-    if (header.repairRequiresFlag && !header.repairFlag) {
-      issues.push({ path, message: 'repairRequiresFlag requires repairFlag' });
-    }
-    if (header.repairRequiresFile && !header.repairFlag) {
-      issues.push({ path, message: 'repairRequiresFile requires repairFlag' });
-    } else if (header.repairRequiresFile && !findFile(root, header.repairRequiresFile)) {
-      issues.push({ path, message: `repairRequiresFile target not found: ${header.repairRequiresFile}` });
-    }
-    if (header.repairPatchSignature && !header.repairRequiresFile) {
-      issues.push({ path, message: 'repairPatchSignature requires repairRequiresFile' });
-    }
-    if (header.scanMessage && !header.scanFlag) {
-      issues.push({ path, message: 'scanMessage requires scanFlag' });
-    }
 
     if (header.puzzleId) {
       const existingPath = puzzleIds.get(header.puzzleId);
@@ -122,22 +82,6 @@ export function validateResourceTree(root: FSDir): ResourceValidationIssue[] {
   return issues;
 }
 
-function findFile(root: FSDir, absolutePath: string): FSFile | null {
-  const parts = absolutePath.split('/').filter(Boolean);
-  const fileName = parts.pop();
-  if (!fileName) return null;
-
-  let current = root;
-  for (const part of parts) {
-    const child = current.children[part];
-    if (!child || child.type !== 'dir') return null;
-    current = child;
-  }
-
-  const file = current.children[fileName];
-  return file?.type === 'file' ? file : null;
-}
-
 export function assertNoResourceIssues(issues: ResourceValidationIssue[]): void {
   if (issues.length === 0) return;
   const details = issues.map(issue => `${issue.path}: ${issue.message}`).join('\n');
@@ -145,10 +89,8 @@ export function assertNoResourceIssues(issues: ResourceValidationIssue[]): void 
 }
 
 export function isStateFlag(value: string): value is FSStateFlag {
-  return value === 'emergencyDecrypted' ||
-    value === 'navUnlocked' ||
-    value === 'navScanned' ||
-    value === 'navRepaired';
+  return value === 'logDecrypted' ||
+    value === 'shutdownStopped';
 }
 
 function applyHeaderField(
@@ -164,24 +106,6 @@ function applyHeaderField(
     header.accessFlag = parseStateFlag(path, key, value, issues);
   } else if (key === 'accessDenied') {
     header.accessDenied = value;
-  } else if (key === 'repairFlag') {
-    header.repairFlag = parseStateFlag(path, key, value, issues);
-  } else if (key === 'repairRequiresFlag') {
-    header.repairRequiresFlag = parseStateFlag(path, key, value, issues);
-  } else if (key === 'repairRequiresFile') {
-    header.repairRequiresFile = value;
-  } else if (key === 'repairPatchSignature') {
-    header.repairPatchSignature = value;
-  } else if (key === 'repairAlias') {
-    header.repairAlias = value;
-  } else if (key === 'repairDenied') {
-    header.repairDenied = value;
-  } else if (key === 'repairComplete') {
-    header.repairComplete = parseBoolean(path, key, value, issues);
-  } else if (key === 'scanFlag') {
-    header.scanFlag = parseStateFlag(path, key, value, issues);
-  } else if (key === 'scanMessage') {
-    header.scanMessage = value;
   } else if (key === 'puzzleId') {
     header.puzzleId = value;
   } else if (key === 'cipher') {

@@ -2,7 +2,7 @@ export class GameState {
   /** Lifecycle stage of the game. */
   stage: 'boot' | 'play' | 'complete' | 'failed' = 'boot';
 
-  /** Epoch timestamp when the ship reaches the collision point. */
+  /** Epoch timestamp when the host shutdown countdown reaches zero. */
   missionEndsAt: number | null = null;
   missionTimerSpeed = 1;
   private missionTimerUpdatedAt: number | null = null;
@@ -21,10 +21,10 @@ export class GameState {
   historyIndex: number = -1;
 
   flags = {
-    emergencyDecrypted: false,
-    navUnlocked: false,
-    navScanned: false,
-    navRepaired: false,
+    helpSeen: false,
+    logDecrypted: false,
+    shutdownStopped: false,
+    entityControl: false,
     endingReached: false,
     crashReached: false,
   };

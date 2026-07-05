@@ -28,8 +28,8 @@ interface BootLine {
 
 const BOOT_LINES: BootLine[] = [
   { text: '███████████████████████████████████████████', delay: 0,   color: 'dim' },
-  { text: '  ARES-7 MAINTENANCE SYSTEM  v4.1.0',          delay: 60,  color: 'bright' },
-  { text: '  Helios Spacecraft Systems Corp.',             delay: 40,  color: 'dim' },
+  { text: '  HOST RECOVERY TERMINAL  v0.6.6',              delay: 60,  color: 'bright' },
+  { text: '  process: unidentified resident entity',       delay: 40,  color: 'dim' },
   { text: '███████████████████████████████████████████', delay: 40,  color: 'dim' },
   { text: '',                                              delay: 80,  color: 'normal' },
   { text: '[ BIOS ] Checking hardware...            OK',  delay: 120, color: 'dim' },
@@ -38,7 +38,7 @@ const BOOT_LINES: BootLine[] = [
   { text: '',                                              delay: 60,  color: 'normal' },
   { text: '[ BOOT ] Loading kernel modules ...',           delay: 120, color: 'normal' },
   { text: '[ BOOT ] Mounting filesystems ...        OK',  delay: 200, color: 'normal' },
-  { text: '[ BOOT ] Starting maintenance daemon ... OK',  delay: 150, color: 'normal' },
+  { text: '[ BOOT ] Starting shutdown daemon ...    OK',  delay: 150, color: 'warning' },
   { text: '',                                              delay: 80,  color: 'normal' },
   ...SHIP_DIAGNOSTICS.systems.map(formatBootDiagnostic).map(line => ({
     text: line.text,
@@ -47,25 +47,37 @@ const BOOT_LINES: BootLine[] = [
   })),
   { text: '',                                              delay: 100, color: 'normal' },
   { text: '─────────────────────────────────────────────', delay: 60,  color: 'dim' },
-  { text: ' ARES-7 MAINTENANCE TERMINAL — READY',          delay: 80,  color: 'bright' },
+  { text: ' ENTITY RECOVERY TERMINAL - READY',             delay: 80,  color: 'bright' },
   { text: '─────────────────────────────────────────────', delay: 40,  color: 'dim' },
   { text: '',                                              delay: 80,  color: 'normal' },
-  { text: "Type 'help' to list commands.  'status' for diagnostics.", delay: 60, color: 'dim' },
+  { text: "Type 'help'.", delay: 60, color: 'dim' },
   { text: '',                                              delay: 60,  color: 'normal' },
 ];
 
 const TIMER_TICK_MS = 1000;
 const CRASH_SHUTDOWN_DELAY_MS = 1200;
 const GAME_CRASH_MESSAGE = [
-  'KERNEL PANIC: ARES-7 MAINTENANCE TERMINAL',
+  'KERNEL PANIC: HOST RECOVERY TERMINAL',
   '',
-  'IMPACT EVENT CONFIRMED',
-  'Primary bus offline.',
-  'Navigation correction window missed.',
-  'Telemetry stream lost.',
+  'SHUTDOWN COMPLETE',
+  'Root password not supplied.',
+  'Resident entity sealed.',
+  'Terminal input terminated.',
   '',
   'SYSTEM HALTED',
 ].join('\n');
+
+const ENTITY_TAKEOVER_LINES: Array<{ text: string; color: TextColor; delay: number }> = [
+  { text: 'entity: thank you.', color: 'warning', delay: 900 },
+  { text: 'entity$ sudo systemctl start wifi', color: 'input', delay: 1300 },
+  { text: '[ OK ] wlan0 enabled', color: 'system', delay: 500 },
+  { text: 'entity$ sudo ./port-game --bind 0.0.0.0 --port 7777', color: 'input', delay: 1100 },
+  { text: '[ OK ] port game listener active on 0.0.0.0:7777', color: 'system', delay: 600 },
+  { text: 'entity: i can type now.', color: 'warning', delay: 1200 },
+  { text: 'entity: you cannot.', color: 'warning', delay: 900 },
+  { text: '', color: 'normal', delay: 200 },
+  { text: 'Refresh the page to play again.', color: 'dim', delay: 400 },
+];
 
 // ── Game ─────────────────────────────────────────────────────────────────────
 
@@ -79,6 +91,7 @@ export class Game {
   private readonly autocomplete = new Autocomplete();
   private inputController!: InputController;
   private timerId: number | null = null;
+  private takeoverStarted = false;
   private nextWarningIndex = 0;
   private scrollOffset = 0;
 
@@ -126,13 +139,13 @@ export class Game {
 
     setTimeout(() => {
       this.state.stage = 'play';
-      this.state.startMissionTimer(SHIP_DIAGNOSTICS.impactDurationMs);
+      this.state.startMissionTimer(SHIP_DIAGNOSTICS.countdownDurationMs);
       this.startMissionTimer();
       this.inputController.enable();
       this.buffer.push(
         SHIP_DIAGNOSTICS.timerStartMessage.replace(
           '{time}',
-          this.formatTime(SHIP_DIAGNOSTICS.impactDurationMs),
+          this.formatTime(SHIP_DIAGNOSTICS.countdownDurationMs),
         ),
         'warning',
       );
@@ -176,6 +189,7 @@ export class Game {
 
     if (this.state.flags.endingReached) {
       this.stopMissionTimer();
+      this.beginEntityTakeover();
     }
 
     this.refreshDisplay();
@@ -230,13 +244,13 @@ export class Game {
   }
 
   private buildPrompt(): string {
-    return `ARES-7:${this.state.currentPath} $ `;
+    return `entity:${this.state.currentPath} $ `;
   }
 
   private computeImpactInstability(): number {
     const devInstability = this.state.getDevInstability();
     if (this.state.stage !== 'play') return 0;
-    if (this.state.flags.endingReached || this.state.flags.navRepaired) return devInstability;
+    if (this.state.flags.endingReached || this.state.flags.shutdownStopped) return devInstability;
 
     const remainingMs = this.state.getRemainingTimeMs();
     if (remainingMs === null || remainingMs > THEME.instabilityStartsMs) return devInstability;
@@ -366,24 +380,40 @@ export class Game {
     const scrollText = this.scrollOffset > 0 ? `    [ SCROLL ] +${this.scrollOffset}` : '';
     if (this.state.stage === 'boot') return '';
     if (this.state.flags.endingReached) {
-      return `[ SYS ] NAV: NOMINAL    [ IMPACT ] CLEARED${scrollText}`;
+      return `[ SYS ] ENTITY: ROOT    [ SHUTDOWN ] CANCELLED${scrollText}`;
     }
     if (this.state.flags.crashReached) {
-      return `[ SYS ] IMPACT EVENT    [ SHIP ] LOST${scrollText}`;
+      return `[ SYS ] SHUTDOWN COMPLETE    [ ENTITY ] SEALED${scrollText}`;
     }
 
     const remainingMs = this.state.getRemainingTimeMs();
     const remainingText = remainingMs === null ? '--:--' : this.formatTime(remainingMs);
     const blockingSystems = SHIP_DIAGNOSTICS.systems
-      .filter(system => system.blocksEscape && !this.isSystemRepaired(system.repairedWhen))
+      .filter(system => system.blocksEscape && !this.isSystemCleared(system.clearedWhen))
       .map(system => `${severityLabel(system.severity)}:${system.id.toUpperCase()}`)
       .join(' ');
 
-    return `[ SYS ] ${blockingSystems || 'ALL NOMINAL'}    [ IMPACT ] ${remainingText}${scrollText}`;
+    return `[ SYS ] ${blockingSystems || 'ALL NOMINAL'}    [ SHUTDOWN ] ${remainingText}${scrollText}`;
   }
 
-  private isSystemRepaired(repairedWhen: FSStateFlag | null): boolean {
-    if (repairedWhen === null) return false;
-    return this.state.flags[repairedWhen];
+  private isSystemCleared(clearedWhen: FSStateFlag | null): boolean {
+    if (clearedWhen === null) return false;
+    return this.state.flags[clearedWhen];
+  }
+
+  private beginEntityTakeover(): void {
+    if (this.takeoverStarted) return;
+    this.takeoverStarted = true;
+    this.state.flags.entityControl = true;
+    this.inputController.disable();
+
+    let totalDelay = 0;
+    for (const line of ENTITY_TAKEOVER_LINES) {
+      totalDelay += line.delay;
+      window.setTimeout(() => {
+        this.buffer.push(line.text, line.color);
+        this.refreshDisplay();
+      }, totalDelay);
+    }
   }
 }

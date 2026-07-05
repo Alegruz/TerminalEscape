@@ -1,0 +1,18 @@
+            .-""""-.
+          .'  .--.  '.
+         /   (    )   \
+        |   / .--. \   |
+        |  | (    ) |  |
+        |   \ '--' /   |
+         \    '--'    /
+          '.        .'
+            '-.__.-'
+
+      the old watcher keeps its shape
+
+          _   _   _
+         / \ / \ / \
+        ( a | p | s )
+         \_/ \_/ \_/
+
+fragment B is read left to right.

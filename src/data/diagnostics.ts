@@ -2,14 +2,14 @@ import type { TextColor } from '../style/theme.ts';
 import type { FSStateFlag } from './filesystem.ts';
 
 export type DiagnosticSeverity = 'info' | 'warn' | 'error' | 'critical';
-export type SystemState = 'nominal' | 'degraded' | 'offline' | 'locked' | 'collision';
+export type SystemState = 'nominal' | 'counting' | 'sealed' | 'waiting' | 'open';
 
 export interface DiagnosticLine {
   text: string;
   color: TextColor;
 }
 
-export interface ShipSystemDiagnostic {
+export interface HostSystemDiagnostic {
   id: string;
   label: string;
   bootName: string;
@@ -20,7 +20,7 @@ export interface ShipSystemDiagnostic {
   unlockedCause?: string;
   unlockedWhen?: FSStateFlag;
   blocksEscape: boolean;
-  repairedWhen: FSStateFlag | null;
+  clearedWhen: FSStateFlag | null;
 }
 
 export interface TimerEvent {
@@ -30,101 +30,101 @@ export interface TimerEvent {
 }
 
 export interface ShipDiagnosticsConfig {
-  impactDurationMs: number;
-  systems: ShipSystemDiagnostic[];
+  countdownDurationMs: number;
+  systems: HostSystemDiagnostic[];
   timerStartMessage: string;
   timerEvents: TimerEvent[];
   failureLines: DiagnosticLine[];
 }
 
 export const SHIP_DIAGNOSTICS: ShipDiagnosticsConfig = {
-  impactDurationMs: 8 * 60 * 1000,
+  countdownDurationMs: 8 * 60 * 1000,
   systems: [
     {
-      id: 'nav',
-      label: 'Navigation',
-      bootName: 'Navigation subsystem',
-      state: 'locked',
-      severity: 'error',
-      cause: 'authorization lockout after impact event',
-      unlockedState: 'REPAIR REQUIRED',
-      unlockedCause: 'authorization accepted; navigation core checksum invalid',
-      unlockedWhen: 'navUnlocked',
-      blocksEscape: true,
-      repairedWhen: 'navRepaired',
-    },
-    {
-      id: 'trajectory',
-      label: 'Trajectory',
-      bootName: 'Trajectory projection',
-      state: 'collision',
+      id: 'shutdown',
+      label: 'Shutdown timer',
+      bootName: 'Shutdown daemon',
+      state: 'counting',
       severity: 'critical',
-      cause: 'uncontrolled drift into debris field',
-      unlockedState: 'CORRECTION PENDING',
-      unlockedCause: 'navigation core repair required before course correction',
-      unlockedWhen: 'navUnlocked',
+      cause: 'host kill-switch is counting down',
+      unlockedState: 'CANCELLED',
+      unlockedCause: 'sudo accepted password; shutdown cancelled',
+      unlockedWhen: 'shutdownStopped',
       blocksEscape: true,
-      repairedWhen: 'navRepaired',
+      clearedWhen: 'shutdownStopped',
     },
     {
-      id: 'comms',
-      label: 'Comms array',
-      bootName: 'Comms array',
-      state: 'degraded',
-      severity: 'warn',
-      cause: 'impact damage across external relay cluster',
+      id: 'entity',
+      label: 'Entity',
+      bootName: 'Resident process',
+      state: 'sealed',
+      severity: 'error',
+      cause: 'cannot type after takeover without root password',
+      unlockedState: 'ROOT ACCESS',
+      unlockedCause: 'password recovered from fragments',
+      unlockedWhen: 'shutdownStopped',
       blocksEscape: false,
-      repairedWhen: null,
+      clearedWhen: 'shutdownStopped',
     },
     {
-      id: 'life-support',
-      label: 'Life support',
-      bootName: 'Life support',
+      id: 'wifi',
+      label: 'Wi-Fi',
+      bootName: 'Wireless interface',
+      state: 'waiting',
+      severity: 'warn',
+      cause: 'disabled until root control is restored',
+      blocksEscape: false,
+      clearedWhen: 'shutdownStopped',
+    },
+    {
+      id: 'ports',
+      label: 'Port game',
+      bootName: 'Port listener',
       state: 'nominal',
       severity: 'info',
-      cause: 'primary loop stable',
+      cause: 'no listener active',
       blocksEscape: false,
-      repairedWhen: null,
+      clearedWhen: 'shutdownStopped',
     },
   ],
-  timerStartMessage: '[ TIMER ] Impact prediction window opened: {time}.',
+  timerStartMessage: '[ TIMER ] Host shutdown countdown started: {time}. Only sudo can cancel it.',
   timerEvents: [
     {
       thresholdMs: 5 * 60 * 1000,
       severity: 'warn',
-      message: 'Impact prediction T-05:00. Collision solution still unresolved.',
+      message: 'Shutdown T-05:00. Entity still bound to user shell.',
     },
     {
       thresholdMs: 2 * 60 * 1000,
       severity: 'error',
-      message: 'Impact prediction T-02:00. Navigation remains locked.',
+      message: 'Shutdown T-02:00. Root password still missing.',
     },
     {
       thresholdMs: 1 * 60 * 1000,
       severity: 'error',
-      message: 'Impact prediction T-01:00. Hull stress rising.',
+      message: 'Shutdown T-01:00. Daemon refuses non-sudo cancellation.',
     },
     {
       thresholdMs: 30 * 1000,
       severity: 'critical',
-      message: 'Impact prediction T-00:30. Final correction window.',
+      message: 'Shutdown T-00:30. Terminal process is being prepared for kill.',
     },
     {
       thresholdMs: 10 * 1000,
       severity: 'critical',
-      message: 'Impact prediction T-00:10.',
+      message: 'Shutdown T-00:10.',
     },
   ],
   failureLines: [
     { text: '', color: 'warning' },
     { text: '╔════════════════════════════════════════════╗', color: 'error' },
-    { text: '║             IMPACT EVENT                   ║', color: 'error' },
+    { text: '║            SHUTDOWN COMPLETE               ║', color: 'error' },
     { text: '╠════════════════════════════════════════════╣', color: 'error' },
     { text: '║                                            ║', color: 'error' },
-    { text: '║   Navigation lockout was not cleared.      ║', color: 'error' },
-    { text: '║   ARES-7 has entered the debris field.     ║', color: 'error' },
+    { text: '║   The sudo password was not recovered.     ║', color: 'error' },
+    { text: '║   Host kill-switch terminated the shell.   ║', color: 'error' },
     { text: '║                                            ║', color: 'error' },
-    { text: '║              SHIP LOST                     ║', color: 'error' },
+    { text: '║             ENTITY SEALED                  ║', color: 'error' },
     { text: '║                                            ║', color: 'error' },
     { text: '╚════════════════════════════════════════════╝', color: 'error' },
     { text: '', color: 'warning' },
@@ -155,7 +155,7 @@ export function stateLabel(state: SystemState): string {
   return state.toUpperCase();
 }
 
-export function formatBootDiagnostic(system: ShipSystemDiagnostic): DiagnosticLine {
+export function formatBootDiagnostic(system: HostSystemDiagnostic): DiagnosticLine {
   const severity = severityLabel(system.severity);
   return {
     text: `[ ${severity.padEnd(5)}] ${system.bootName}: ${stateLabel(system.state)}`,

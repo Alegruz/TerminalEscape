@@ -9,13 +9,11 @@ import { clearCommand } from './clear.ts';
 import { statusCommand } from './status.ts';
 import { analyzeCommand } from './analyze.ts';
 import { decryptCommand } from './decrypt.ts';
-import { authCommand } from './auth.ts';
-import { repairCommand } from './repair.ts';
 import { fileCommand } from './file.ts';
 import { headCommand, tailCommand } from './head.ts';
 import { grepCommand } from './grep.ts';
 import { stringsCommand } from './strings.ts';
-import { scanCommand } from './scan.ts';
+import { sudoCommand } from './sudo.ts';
 import { devFxCommand, devSpeedCommand } from './dev.ts';
 
 const HANDLERS: Record<string, CommandHandler> = {
@@ -32,11 +30,9 @@ const HANDLERS: Record<string, CommandHandler> = {
   tail: tailCommand,
   grep: grepCommand,
   strings: stringsCommand,
-  scan: scanCommand,
+  sudo: sudoCommand,
   analyze: analyzeCommand,
   decrypt: decryptCommand,
-  auth: authCommand,
-  repair: repairCommand,
   'dev-fx': devFxCommand,
   'dev-speed': devSpeedCommand,
 };

@@ -5,24 +5,13 @@ import process from 'node:process';
 const RESOURCE_ROOT = path.resolve('src/resources/filesystem');
 const HEADER_SUFFIX = '.header';
 const VALID_STATE_FLAGS = new Set([
-  'emergencyDecrypted',
-  'navUnlocked',
-  'navScanned',
-  'navRepaired',
+  'logDecrypted',
+  'shutdownStopped',
 ]);
 const VALID_HEADER_FIELDS = new Set([
   'hidden',
   'accessFlag',
   'accessDenied',
-  'repairFlag',
-  'repairRequiresFlag',
-  'repairRequiresFile',
-  'repairPatchSignature',
-  'repairAlias',
-  'repairDenied',
-  'repairComplete',
-  'scanFlag',
-  'scanMessage',
   'puzzleId',
   'cipher',
   'key',
@@ -49,7 +38,7 @@ for (const file of files) {
   headers.push({ path: targetPath, header });
 }
 
-validateHeaders(headers, resourcePaths, issues);
+validateHeaders(headers, issues);
 
 if (issues.length > 0) {
   console.error('Resource validation failed:');
@@ -100,7 +89,7 @@ function parseHeader(headerPath, content, issueList) {
       return;
     }
 
-    if (key === 'hidden' || key === 'repairComplete') {
+    if (key === 'hidden') {
       if (value !== 'true' && value !== 'false') {
         issueList.push(`${headerPath}: invalid ${key} value '${value}', expected true or false`);
       }
@@ -125,41 +114,10 @@ function parseHeader(headerPath, content, issueList) {
   return header;
 }
 
-function validateHeaders(headers, resourcePaths, issueList) {
-  const repairAliases = new Map();
+function validateHeaders(headers, issueList) {
   const puzzleIds = new Map();
 
   for (const { path: targetPath, header } of headers) {
-    if (header.repairAlias) {
-      const existing = repairAliases.get(header.repairAlias);
-      if (existing) {
-        issueList.push(`${targetPath}: duplicate repairAlias '${header.repairAlias}' already used by ${existing}`);
-      } else {
-        repairAliases.set(header.repairAlias, targetPath);
-      }
-    }
-
-    if (header.repairComplete && !header.repairFlag) {
-      issueList.push(`${targetPath}: repairComplete requires repairFlag`);
-    }
-    if (header.repairRequiresFlag && !header.repairFlag) {
-      issueList.push(`${targetPath}: repairRequiresFlag requires repairFlag`);
-    }
-    if (header.repairRequiresFile && !header.repairFlag) {
-      issueList.push(`${targetPath}: repairRequiresFile requires repairFlag`);
-    } else if (
-      header.repairRequiresFile &&
-      !resourcePaths.has(header.repairRequiresFile.replace(/^\/+/, ''))
-    ) {
-      issueList.push(`${targetPath}: repairRequiresFile target not found: ${header.repairRequiresFile}`);
-    }
-    if (header.repairPatchSignature && !header.repairRequiresFile) {
-      issueList.push(`${targetPath}: repairPatchSignature requires repairRequiresFile`);
-    }
-    if (header.scanMessage && !header.scanFlag) {
-      issueList.push(`${targetPath}: scanMessage requires scanFlag`);
-    }
-
     if (header.puzzleId) {
       const existing = puzzleIds.get(header.puzzleId);
       if (existing) {

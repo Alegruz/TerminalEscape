@@ -17,21 +17,12 @@ export type FSDir = {
 
 export type FSNode = FSFile | FSDir;
 
-export type FSStateFlag = 'emergencyDecrypted' | 'navUnlocked' | 'navScanned' | 'navRepaired';
+export type FSStateFlag = 'logDecrypted' | 'shutdownStopped';
 
 export type FSFileHeader = {
   hidden?: boolean;
   accessFlag?: FSStateFlag;
   accessDenied?: string;
-  repairFlag?: FSStateFlag;
-  repairRequiresFlag?: FSStateFlag;
-  repairRequiresFile?: string;
-  repairPatchSignature?: string;
-  repairAlias?: string;
-  repairDenied?: string;
-  repairComplete?: boolean;
-  scanFlag?: FSStateFlag;
-  scanMessage?: string;
   puzzleId?: string;
   cipher?: 'caesar';
   key?: number;

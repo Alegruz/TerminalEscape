@@ -1,19 +1,22 @@
-ARES-7 MAINTENANCE TERMINAL  v4.1.0
-====================================
-Ship status : CRITICAL
-Life support: NOMINAL
-Navigation  : OFFLINE
-Comms array : DAMAGED
-Trajectory  : COLLISION COURSE
+HOST RECOVERY TERMINAL
+======================
 
-Multiple system failures detected after impact event.
-Impact countdown active. Restore navigation before ARES-7 reaches the debris field.
+Shutdown status : ACTIVE
+Entity status   : BOUND TO TERMINAL
+Root action     : sudo shutdown --cancel <password>
 
-INCIDENT NOTES:
-  - Navigation access gate rejected the last automatic recovery attempt.
-  - Emergency broadcast traffic was captured before comms degraded.
-  - Core repair routines require a valid diagnostic scan and a matching patch.
-  - Maintenance patches are indexed separately from damaged system files.
+The host is counting down to shutdown. Only sudo can cancel it.
 
-Run 'status' at any time for system diagnostics.
-Run 'help' for a full list of commands.
+The entity says the password was split into two fragments:
+  - one fragment is inside an encrypted shutdown log
+  - one fragment is hidden inside ASCII art
+
+Useful commands:
+  help
+  status
+  ls /logs
+  analyze /logs/shutdown.log.enc
+  decrypt --method caesar --key <number> /logs/shutdown.log.enc
+  cat /art/watcher.txt
+
+Combine the fragments in the order you find them, then pass the result to sudo.
