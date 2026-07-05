@@ -42,3 +42,18 @@ TypeScript, and builds with Vite.
 
 Game resources live in `src/resources/filesystem`. Header sidecars use the
 `.header` suffix and are validated by `scripts/validate-resources.mjs`.
+
+## itch.io Upload
+
+Do not upload the repository zip to itch.io. The root `index.html` is for Vite
+development and points at `/src/main.ts`, which itch.io cannot serve.
+
+Create the playable upload zip with:
+
+```sh
+npm run package:itch
+```
+
+Upload `terminal-escape-itch.zip` to itch.io and choose "This file will be played
+in the browser". The zip contains the built `dist` files with relative asset
+paths so they work from itch.io's hosted iframe URL.

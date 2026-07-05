@@ -12,6 +12,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+terminal-escape-itch.zip
 *.local
 
 # Editor directories and files

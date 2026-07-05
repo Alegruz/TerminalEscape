@@ -12,6 +12,7 @@
     "validate:commands": "node scripts/validate-commands.mjs",
     "dev": "vite",
     "build": "npm run validate:resources && npm run validate:commands && tsc && vite build",
+    "package:itch": "npm run build && cd dist && zip -r ../terminal-escape-itch.zip .",
     "preview": "vite preview"
   },
   "devDependencies": {
