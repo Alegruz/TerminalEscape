@@ -8,6 +8,8 @@ export class InputController {
   private _cursorPos: number = 0;
   /** True while the terminal is accepting user input. */
   private _enabled: boolean = false;
+  /** True while Enter is allowed to submit the current input. */
+  private _submitEnabled: boolean = true;
 
   private readonly onSubmit: (input: string) => void;
   private readonly onTab: (input: string) => void;
@@ -38,6 +40,8 @@ export class InputController {
 
   enable(): void  { this._enabled = true; }
   disable(): void { this._enabled = false; }
+  enableSubmit(): void { this._submitEnabled = true; }
+  disableSubmit(): void { this._submitEnabled = false; }
 
   /** Replace the current input (e.g. from history navigation or autocomplete). */
   setInput(value: string): void {
@@ -54,6 +58,8 @@ export class InputController {
     switch (e.key) {
       case 'Enter': {
         e.preventDefault();
+        if (!this._submitEnabled) break;
+
         const cmd = this._input;
         this._input = '';
         this._cursorPos = 0;

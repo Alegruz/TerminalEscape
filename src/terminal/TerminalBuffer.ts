@@ -26,6 +26,11 @@ export class TerminalBuffer {
     for (const l of lines) this.push(l.text, l.color);
   }
 
+  replaceAt(index: number, text: string, color: TextColor = 'normal'): void {
+    if (index < 0 || index >= this.lines.length) return;
+    this.lines[index] = { text, color };
+  }
+
   clear(): void {
     this.lines = [];
   }

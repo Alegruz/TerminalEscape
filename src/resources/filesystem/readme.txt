@@ -1,13 +1,13 @@
-HOST RECOVERY TERMINAL
-======================
+BastionOS Recovery Console
+==========================
 
 Shutdown status : ACTIVE
-Entity status   : BOUND TO TERMINAL
+Resident status : BOUND TO TERMINAL
 Root action     : sudo shutdown --cancel <password>
 
 The host is counting down to shutdown. Only sudo can cancel it.
 
-The entity says the password was split into two fragments:
+The resident process says the password was split into two fragments:
   - one fragment is inside an encrypted shutdown log
   - one fragment is hidden inside ASCII art
 

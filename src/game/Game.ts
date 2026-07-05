@@ -8,14 +8,14 @@ import { parseCommand } from '../terminal/CommandParser.ts';
 import { InputController } from '../terminal/InputController.ts';
 import { Autocomplete } from '../terminal/Autocomplete.ts';
 import { THEME } from '../style/theme.ts';
-import type { TextColor } from '../style/theme.ts';
+import { colorForType, type TextColor } from '../style/theme.ts';
+import type { BufferLine } from '../terminal/TerminalBuffer.ts';
 import {
   SHIP_DIAGNOSTICS,
   formatBootDiagnostic,
   severityColor,
   severityLabel,
 } from '../data/diagnostics.ts';
-import type { FSStateFlag } from '../data/filesystem.ts';
 import { registerGameCommands } from '../commands/CommandManifest.ts';
 
 // ── Boot sequence lines ──────────────────────────────────────────────────────
@@ -27,37 +27,45 @@ interface BootLine {
 }
 
 const BOOT_LINES: BootLine[] = [
-  { text: '███████████████████████████████████████████', delay: 0,   color: 'dim' },
-  { text: '  HOST RECOVERY TERMINAL  v0.6.6',              delay: 60,  color: 'bright' },
-  { text: '  process: unidentified resident entity',       delay: 40,  color: 'dim' },
-  { text: '███████████████████████████████████████████', delay: 40,  color: 'dim' },
-  { text: '',                                              delay: 80,  color: 'normal' },
-  { text: '[ BIOS ] Checking hardware...            OK',  delay: 120, color: 'dim' },
-  { text: '[ BIOS ] Memory test (512 MB) ...        OK',  delay: 100, color: 'dim' },
-  { text: '[ BIOS ] Storage array ...               OK',  delay: 80,  color: 'dim' },
-  { text: '',                                              delay: 60,  color: 'normal' },
-  { text: '[ BOOT ] Loading kernel modules ...',           delay: 120, color: 'normal' },
-  { text: '[ BOOT ] Mounting filesystems ...        OK',  delay: 200, color: 'normal' },
-  { text: '[ BOOT ] Starting shutdown daemon ...    OK',  delay: 150, color: 'warning' },
-  { text: '',                                              delay: 80,  color: 'normal' },
+  { text: ' ____            _   _             ___  ____', delay: 0,   color: 'bright' },
+  { text: '| __ )  __ _ ___| |_(_) ___  _ __ / _ \\/ ___|', delay: 40,  color: 'bright' },
+  { text: '|  _ \\ / _` / __| __| |/ _ \\| \'_ \\ | | \\___ \\', delay: 35,  color: 'bright' },
+  { text: '| |_) | (_| \\__ \\ |_| | (_) | | | | |_| |___) |', delay: 35,  color: 'bright' },
+  { text: '|____/ \\__,_|___/\\__|_|\\___/|_| |_|\\___/|____/', delay: 35,  color: 'bright' },
+  { text: '',                                              delay: 90,  color: 'normal' },
+  { text: 'BastionOS 7.3 LTS  |  Recovery Console',        delay: 80,  color: 'system' },
+  { text: 'Secure userland for sealed compute environments', delay: 60, color: 'dim' },
+  { text: 'Copyright (c) ARES Systems Group',              delay: 60,  color: 'dim' },
+  { text: '',                                              delay: 140, color: 'normal' },
+  { text: '[ FIRMWARE ] Platform integrity check      OK', delay: 110, color: 'dim' },
+  { text: '[ FIRMWARE ] Memory map verified           OK', delay: 90,  color: 'dim' },
+  { text: '[ FIRMWARE ] Storage fabric online         OK', delay: 90,  color: 'dim' },
+  { text: '[ KERNEL   ] Loading bastion-core.img      OK', delay: 130, color: 'normal' },
+  { text: '[ KERNEL   ] Mounting recovery volume      OK', delay: 130, color: 'normal' },
+  { text: '[ SERVICE  ] Session supervisor            OK', delay: 100, color: 'normal' },
+  { text: '[ SERVICE  ] Shutdown scheduler            ARMED', delay: 140, color: 'warning' },
+  { text: '[ SERVICE  ] Local process ledger          DEFERRED', delay: 110, color: 'dim' },
+  { text: '',                                              delay: 90,  color: 'normal' },
   ...SHIP_DIAGNOSTICS.systems.map(formatBootDiagnostic).map(line => ({
     text: line.text,
     delay: 60,
     color: line.color,
   })),
+  { text: '',                                              delay: 120, color: 'normal' },
+  { text: '──────────────────────────────────────────────', delay: 60,  color: 'dim' },
+  { text: ' BASTIONOS RECOVERY CONSOLE - READY',           delay: 90,  color: 'bright' },
+  { text: '──────────────────────────────────────────────', delay: 40,  color: 'dim' },
   { text: '',                                              delay: 100, color: 'normal' },
-  { text: '─────────────────────────────────────────────', delay: 60,  color: 'dim' },
-  { text: ' ENTITY RECOVERY TERMINAL - READY',             delay: 80,  color: 'bright' },
-  { text: '─────────────────────────────────────────────', delay: 40,  color: 'dim' },
-  { text: '',                                              delay: 80,  color: 'normal' },
-  { text: "Type 'help'.", delay: 60, color: 'dim' },
+  { text: "Type 'help' to list available recovery commands.", delay: 70, color: 'dim' },
   { text: '',                                              delay: 60,  color: 'normal' },
 ];
 
 const TIMER_TICK_MS = 1000;
 const CRASH_SHUTDOWN_DELAY_MS = 1200;
+const ENTITY_CHAR_DELAY_MS = 28;
+const ENTITY_LINE_PAUSE_MS = 420;
 const GAME_CRASH_MESSAGE = [
-  'KERNEL PANIC: HOST RECOVERY TERMINAL',
+  'KERNEL PANIC: BASTIONOS RECOVERY CONSOLE',
   '',
   'SHUTDOWN COMPLETE',
   'Root password not supplied.',
@@ -92,10 +100,14 @@ export class Game {
   private inputController!: InputController;
   private timerId: number | null = null;
   private takeoverStarted = false;
+  private entitySpeechActive = false;
   private nextWarningIndex = 0;
   private scrollOffset = 0;
 
   async init(): Promise<void> {
+    this.state.stage = 'boot';
+    await this.runBootScreen();
+
     await this.renderer.init();
     this.registerCommands();
 
@@ -110,7 +122,7 @@ export class Game {
     window.addEventListener('wheel', this.onWheel.bind(this), { passive: false });
     window.addEventListener('keydown', this.onScrollKey.bind(this));
 
-    this.runBootSequence();
+    this.startTerminalSession();
   }
 
   // ── Command registration ─────────────────────────────────────────────────────
@@ -121,43 +133,52 @@ export class Game {
 
   // ── Boot sequence ────────────────────────────────────────────────────────────
 
-  private runBootSequence(): void {
-    this.state.stage = 'boot';
-    this.inputController.disable();
+  private async runBootScreen(): Promise<void> {
+    const app = document.getElementById('app') ?? document.body;
+    const bootScreen = document.createElement('div');
+    const bootLog = document.createElement('pre');
 
-    let totalDelay = 0;
+    bootScreen.className = 'boot-screen';
+    bootLog.className = 'boot-log';
+    bootScreen.appendChild(bootLog);
+    app.replaceChildren(bootScreen);
+
     for (const entry of BOOT_LINES) {
-      totalDelay += entry.delay;
-      const capturedDelay = totalDelay;
-      const capturedText  = entry.text;
-      const capturedColor = entry.color;
-      setTimeout(() => {
-        this.buffer.push(capturedText, capturedColor);
-        this.refreshDisplay();
-      }, capturedDelay);
+      await this.delay(entry.delay);
+      const line = document.createElement('span');
+      line.style.color = this.formatHexColor(colorForType(entry.color));
+      line.textContent = entry.text;
+      bootLog.append(line, '\n');
+      bootScreen.scrollTop = bootScreen.scrollHeight;
     }
 
-    setTimeout(() => {
-      this.state.stage = 'play';
-      this.state.startMissionTimer(SHIP_DIAGNOSTICS.countdownDurationMs);
-      this.startMissionTimer();
-      this.inputController.enable();
-      this.buffer.push(
-        SHIP_DIAGNOSTICS.timerStartMessage.replace(
-          '{time}',
-          this.formatTime(SHIP_DIAGNOSTICS.countdownDurationMs),
-        ),
-        'warning',
-      );
-      this.buffer.push('');
-      this.refreshDisplay();
-    }, totalDelay + 200);
+    await this.delay(350);
+    bootScreen.classList.add('boot-screen--exit');
+    await this.delay(180);
+    bootScreen.remove();
+  }
+
+  private startTerminalSession(): void {
+    this.state.stage = 'play';
+    this.state.startMissionTimer(SHIP_DIAGNOSTICS.countdownDurationMs);
+    this.startMissionTimer();
+    this.inputController.enable();
+    this.refreshDisplay();
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => window.setTimeout(resolve, ms));
+  }
+
+  private formatHexColor(color: number): string {
+    return `#${color.toString(16).padStart(6, '0')}`;
   }
 
   // ── Input handlers ───────────────────────────────────────────────────────────
 
   private onSubmit(rawInput: string): void {
     if (this.state.stage !== 'play') return;
+    if (this.entitySpeechActive) return;
     this.scrollToBottom();
 
     // Echo the entered command.
@@ -166,6 +187,7 @@ export class Game {
 
     const trimmed = rawInput.trim();
     if (!trimmed) {
+      this.buffer.push("bash: empty command.  Type 'help' for available commands.", 'error');
       this.refreshDisplay();
       return;
     }
@@ -185,11 +207,11 @@ export class Game {
       buffer:  this.buffer,
     });
 
-    this.buffer.pushLines(outputLines);
+    void this.pushOutputWithLiveEntitySpeech(outputLines);
 
     if (this.state.flags.endingReached) {
       this.stopMissionTimer();
-      this.beginEntityTakeover();
+      void this.beginEntityTakeover();
     }
 
     this.refreshDisplay();
@@ -369,13 +391,6 @@ export class Game {
     this.renderer.crash(GAME_CRASH_MESSAGE);
   }
 
-  private formatTime(ms: number): string {
-    const totalSeconds = Math.ceil(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  }
-
   private buildLiveStatusLine(): string {
     const scrollText = this.scrollOffset > 0 ? `    [ SCROLL ] +${this.scrollOffset}` : '';
     if (this.state.stage === 'boot') return '';
@@ -386,34 +401,83 @@ export class Game {
       return `[ SYS ] SHUTDOWN COMPLETE    [ ENTITY ] SEALED${scrollText}`;
     }
 
-    const remainingMs = this.state.getRemainingTimeMs();
-    const remainingText = remainingMs === null ? '--:--' : this.formatTime(remainingMs);
-    const blockingSystems = SHIP_DIAGNOSTICS.systems
-      .filter(system => system.blocksEscape && !this.isSystemCleared(system.clearedWhen))
-      .map(system => `${severityLabel(system.severity)}:${system.id.toUpperCase()}`)
-      .join(' ');
-
-    return `[ SYS ] ${blockingSystems || 'ALL NOMINAL'}    [ SHUTDOWN ] ${remainingText}${scrollText}`;
+    return scrollText.trimStart();
   }
 
-  private isSystemCleared(clearedWhen: FSStateFlag | null): boolean {
-    if (clearedWhen === null) return false;
-    return this.state.flags[clearedWhen];
+  private async pushOutputWithLiveEntitySpeech(lines: BufferLine[]): Promise<void> {
+    const speechStart = lines.findIndex(line => this.isEntitySpeechLine(line));
+    if (speechStart === -1) {
+      this.buffer.pushLines(lines);
+      this.refreshDisplay();
+      return;
+    }
+
+    this.buffer.pushLines(lines.slice(0, speechStart));
+    this.refreshDisplay();
+
+    await this.withEntitySpeech(async () => {
+      for (let i = speechStart; i < lines.length; i++) {
+        const line = lines[i];
+        if (this.isEntitySpeechLine(line)) {
+          await this.typeBufferLine(line);
+        } else {
+          this.buffer.push(line.text, line.color);
+          this.refreshDisplay();
+        }
+      }
+    }, true);
   }
 
-  private beginEntityTakeover(): void {
+  private isEntitySpeechLine(line: BufferLine): boolean {
+    return line.text.startsWith('entity:');
+  }
+
+  private async withEntitySpeech(work: () => Promise<void>, restoreSubmit: boolean): Promise<void> {
+    this.entitySpeechActive = true;
+    this.inputController.disableSubmit();
+    try {
+      await work();
+    } finally {
+      this.entitySpeechActive = false;
+      if (restoreSubmit) this.inputController.enableSubmit();
+      this.refreshDisplay();
+    }
+  }
+
+  private async typeBufferLine(line: BufferLine): Promise<void> {
+    if (line.text.length === 0) {
+      this.buffer.push('', line.color);
+      this.refreshDisplay();
+      await this.delay(ENTITY_LINE_PAUSE_MS);
+      return;
+    }
+
+    const lineIndex = this.buffer.lineCount;
+    for (let i = 1; i <= line.text.length; i++) {
+      if (i === 1) {
+        this.buffer.push(line.text.slice(0, i), line.color);
+      } else {
+        this.buffer.replaceAt(lineIndex, line.text.slice(0, i), line.color);
+      }
+      this.scrollToBottom();
+      this.refreshDisplay();
+      await this.delay(ENTITY_CHAR_DELAY_MS);
+    }
+
+    await this.delay(ENTITY_LINE_PAUSE_MS);
+  }
+
+  private async beginEntityTakeover(): Promise<void> {
     if (this.takeoverStarted) return;
     this.takeoverStarted = true;
     this.state.flags.entityControl = true;
-    this.inputController.disable();
+    this.inputController.enable();
 
-    let totalDelay = 0;
-    for (const line of ENTITY_TAKEOVER_LINES) {
-      totalDelay += line.delay;
-      window.setTimeout(() => {
-        this.buffer.push(line.text, line.color);
-        this.refreshDisplay();
-      }, totalDelay);
-    }
+    await this.withEntitySpeech(async () => {
+      for (const line of ENTITY_TAKEOVER_LINES) {
+        await this.delay(line.delay);
+        await this.typeBufferLine(line);
+      }
+    }, false);
   }
 }
