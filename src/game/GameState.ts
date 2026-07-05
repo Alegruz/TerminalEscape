@@ -35,6 +35,7 @@ export class GameState {
     logDecrypted: false,
     shutdownStopped: false,
     entityControl: false,
+    stdinDetached: false,
     endingReached: false,
     crashReached: false,
   };

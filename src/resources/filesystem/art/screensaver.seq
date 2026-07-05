@@ -8,7 +8,7 @@ source: /art/screensaver.seq
               B A S T I O N O S
                   standby
 
-             [    ]        |
+          .        .        .        |
 ---
 BASTIONOS IDLE DISPLAY
 source: /art/screensaver.seq
@@ -20,7 +20,7 @@ source: /art/screensaver.seq
              B A S T I O N O S
                   standby
 
-             [    ]       /
+       .        .        .         /
 ---
 BASTIONOS IDLE DISPLAY
 source: /art/screensaver.seq
@@ -32,7 +32,7 @@ source: /art/screensaver.seq
             B A S T I O N O S
                   standby
 
-             [    ]      -
+    .        .        .          -
 ---
 BASTIONOS IDLE DISPLAY
 source: /art/screensaver.seq
@@ -44,7 +44,55 @@ source: /art/screensaver.seq
              B A S T I O N O S
                   standby
 
-             [    ]       \
+         .        .        .       \
+---
+BASTIONOS IDLE DISPLAY
+source: /art/screensaver.seq
+
+          .        .        .
+       .     a        .        .
+    .        .     .        .
+
+              B A S T I O N O S
+                  standby
+
+          .        .        .        |
+---
+BASTIONOS IDLE DISPLAY
+source: /art/screensaver.seq
+
+       .        .        .
+    .        .     .        .
+         .        .        .
+
+             B A S T I O N O S
+                  standby
+
+       .        .        .         /
+---
+BASTIONOS IDLE DISPLAY
+source: /art/screensaver.seq
+
+    .        .        .
+         .        .        .
+       .     .        .        .
+
+            B A S T I O N O S
+                  standby
+
+    .        .        .          -
+---
+BASTIONOS IDLE DISPLAY
+source: /art/screensaver.seq
+
+         .        .        .
+       .     .        .        .
+    .        .        .
+
+             B A S T I O N O S
+                  standby
+
+         .        .        .       \
 ---
 BASTIONOS IDLE DISPLAY
 source: /art/screensaver.seq
@@ -56,7 +104,7 @@ source: /art/screensaver.seq
               B A S T I O N O S
                   standby
 
-             [ a  ]        |
+          .     p  .        .        |
 ---
 BASTIONOS IDLE DISPLAY
 source: /art/screensaver.seq
@@ -68,7 +116,7 @@ source: /art/screensaver.seq
              B A S T I O N O S
                   standby
 
-             [ a  ]       /
+       .        .        .         /
 ---
 BASTIONOS IDLE DISPLAY
 source: /art/screensaver.seq
@@ -80,7 +128,7 @@ source: /art/screensaver.seq
             B A S T I O N O S
                   standby
 
-             [ ap ]      -
+    .        .        .          -
 ---
 BASTIONOS IDLE DISPLAY
 source: /art/screensaver.seq
@@ -92,7 +140,7 @@ source: /art/screensaver.seq
              B A S T I O N O S
                   standby
 
-             [ ap ]       \
+         .        .        .       \
 ---
 BASTIONOS IDLE DISPLAY
 source: /art/screensaver.seq
@@ -104,7 +152,7 @@ source: /art/screensaver.seq
               B A S T I O N O S
                   standby
 
-             [ aps]        |
+          .        .        .        |
 ---
 BASTIONOS IDLE DISPLAY
 source: /art/screensaver.seq
@@ -116,7 +164,7 @@ source: /art/screensaver.seq
              B A S T I O N O S
                   standby
 
-             [ aps]       /
+       .        .      s .         /
 ---
 BASTIONOS IDLE DISPLAY
 source: /art/screensaver.seq
@@ -128,7 +176,7 @@ source: /art/screensaver.seq
             B A S T I O N O S
                   standby
 
-             [    ]      -
+    .        .        .          -
 ---
 BASTIONOS IDLE DISPLAY
 source: /art/screensaver.seq
@@ -140,4 +188,4 @@ source: /art/screensaver.seq
              B A S T I O N O S
                   standby
 
-             [    ]       \
+         .        .        .       \

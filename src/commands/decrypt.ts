@@ -82,7 +82,7 @@ export function decryptCommand(
     state.flags[solved.solveFlag] = true;
     lines.push(out(''));
     lines.push(out('[DECRYPTION VERIFIED]', 'system'));
-    lines.push(out('Password fragment recovered from shutdown log.', 'system'));
+    lines.push(out('Log signature accepted by recovery policy.', 'system'));
     lines.push(out(''));
   }
 

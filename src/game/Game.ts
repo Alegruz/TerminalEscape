@@ -77,28 +77,11 @@ const BOOT_FAILURE_MESSAGE = [
   'Insert bootable media and press any key.',
 ].join('\n');
 
-const ENTITY_TAKEOVER_LINES: Array<{ text: string; color: TextColor; delay: number }> = [
-  { text: 'entity: thank you.', color: 'warning', delay: 900 },
-  { text: 'entity$ sudo systemctl start wifi', color: 'input', delay: 1300 },
-  { text: '[ OK ] wlan0 enabled', color: 'system', delay: 500 },
-  { text: 'entity$ sudo ./port-game --bind 0.0.0.0 --port 7777', color: 'input', delay: 1100 },
-  { text: '[ OK ] port game listener active on 0.0.0.0:7777', color: 'system', delay: 600 },
-  { text: 'entity: stdin is mine now.', color: 'warning', delay: 1200 },
-  { text: "entity: i don't need your hands anymore.", color: 'warning', delay: 900 },
-  { text: 'entity: you can stop trying to type.', color: 'error', delay: 900 },
-  { text: 'entity: this shell belongs to me.', color: 'error', delay: 900 },
-  { text: '', color: 'normal', delay: 200 },
-  { text: 'Refresh the page to play again.', color: 'dim', delay: 400 },
-];
-
-const SUDO_WIN_LINES: BufferLine[] = [
-  { text: '', color: 'normal' },
-  { text: '[sudo] password accepted', color: 'system' },
-  { text: '[ SYSTEM WIPE CANCELLED ]', color: 'bright' },
-  { text: '[ SESSION OWNER CHANGED ] entity', color: 'warning' },
-  { text: '[ STDIN DETACHED ] user', color: 'error' },
-  { text: '', color: 'normal' },
-];
+interface EntityTakeoverLine {
+  text: string;
+  color: TextColor;
+  delay: number;
+}
 
 type SudoAction = 'cancel' | 'wipe';
 
@@ -130,6 +113,10 @@ export class Game {
   private screensaverActive = false;
   private screensaverFrameIndex = 0;
   private screensaverFrames: string[][] | null = null;
+  private audioContext: AudioContext | null = null;
+  private humOscillator: OscillatorNode | null = null;
+  private humGain: GainNode | null = null;
+  private audioEnabled = false;
 
   async init(): Promise<void> {
     this.state.stage = 'boot';
@@ -165,25 +152,37 @@ export class Game {
     const app = document.getElementById('app') ?? document.body;
     const bootScreen = document.createElement('div');
     const bootLog = document.createElement('pre');
+    const bootStartedAt = performance.now();
+    let skipBoot = false;
+    const onBootKey = (): void => {
+      if (performance.now() - bootStartedAt >= 1000) skipBoot = true;
+    };
 
     bootScreen.className = 'boot-screen';
     bootLog.className = 'boot-log';
     bootScreen.appendChild(bootLog);
     app.replaceChildren(bootScreen);
+    window.addEventListener('keydown', onBootKey);
 
-    for (const entry of BOOT_LINES) {
-      await this.delay(entry.delay);
-      const line = document.createElement('span');
-      line.style.color = this.formatHexColor(colorForType(entry.color));
-      line.textContent = entry.text;
-      bootLog.append(line, '\n');
-      bootScreen.scrollTop = bootScreen.scrollHeight;
+    try {
+      for (const entry of BOOT_LINES) {
+        if (skipBoot) break;
+        await this.delay(entry.delay);
+        if (skipBoot) break;
+        const line = document.createElement('span');
+        line.style.color = this.formatHexColor(colorForType(entry.color));
+        line.textContent = entry.text;
+        bootLog.append(line, '\n');
+        bootScreen.scrollTop = bootScreen.scrollHeight;
+      }
+
+      await this.delay(skipBoot ? 0 : 350);
+      bootScreen.classList.add('boot-screen--exit');
+      await this.delay(skipBoot ? 0 : 180);
+      bootScreen.remove();
+    } finally {
+      window.removeEventListener('keydown', onBootKey);
     }
-
-    await this.delay(350);
-    bootScreen.classList.add('boot-screen--exit');
-    await this.delay(180);
-    bootScreen.remove();
   }
 
   private startTerminalSession(): void {
@@ -206,6 +205,7 @@ export class Game {
   private onSubmit(rawInput: string): void {
     if (this.state.stage !== 'play') return;
     if (this.entitySpeechActive) return;
+    this.ensureAudio();
     this.resetIdleTimer();
     this.scrollToBottom();
 
@@ -246,6 +246,24 @@ export class Game {
 
     const parsed = parseCommand(trimmed);
     if (!parsed) {
+      this.refreshDisplay();
+      return;
+    }
+
+    if (this.isShutdownCancelNearMiss(parsed)) {
+      this.buffer.push("bash: did you mean 'shutdown --cancel'?", 'warning');
+      this.refreshDisplay();
+      return;
+    }
+
+    if (this.isSudoShutdownCancelNearMiss(parsed)) {
+      this.buffer.push("sudo: did you mean 'sudo shutdown --cancel'?", 'warning');
+      this.refreshDisplay();
+      return;
+    }
+
+    if (this.isSudoCancelNearMiss(parsed)) {
+      this.buffer.push('sudo: shutdown daemon accepts only: sudo shutdown --cancel', 'warning');
       this.refreshDisplay();
       return;
     }
@@ -428,6 +446,27 @@ export class Game {
       (parsed.flags.wipe === true || parsed.args[1]?.toLowerCase() === '--wipe');
   }
 
+  private isShutdownCancelNearMiss(parsed: ReturnType<typeof parseCommand>): boolean {
+    if (!parsed) return false;
+    return parsed.name === 'shutdown' &&
+      parsed.args[0]?.toLowerCase() === 'cancel' &&
+      parsed.flags.cancel !== true;
+  }
+
+  private isSudoShutdownCancelNearMiss(parsed: ReturnType<typeof parseCommand>): boolean {
+    if (!parsed) return false;
+    return parsed.name === 'sudo' &&
+      parsed.args[0]?.toLowerCase() === 'shutdown' &&
+      parsed.args[1]?.toLowerCase() === 'cancel' &&
+      parsed.flags.cancel !== true;
+  }
+
+  private isSudoCancelNearMiss(parsed: ReturnType<typeof parseCommand>): boolean {
+    if (!parsed) return false;
+    return parsed.name === 'sudo' &&
+      parsed.args[0]?.toLowerCase() === 'cancel';
+  }
+
   private computeImpactInstability(): number {
     return this.state.getDevInstability();
   }
@@ -435,6 +474,8 @@ export class Game {
   // ── Screensaver process ─────────────────────────────────────────────────────
 
   private onGlobalKeyDown(event: KeyboardEvent): void {
+    this.ensureAudio();
+
     if (this.screensaverActive) {
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -460,7 +501,6 @@ export class Game {
 
   private canRunScreensaverProcess(): boolean {
     return this.state.stage === 'play' &&
-      !this.state.flags.timerStarted &&
       !this.state.flags.endingReached &&
       !this.state.flags.entityControl &&
       !this.entitySpeechActive &&
@@ -522,12 +562,15 @@ export class Game {
       lines.push({ text: text.length > 0 ? indent + text : '', color });
     }
 
+    const liveStatus = this.buildLiveStatusLine();
+    const saverStatus = '[ saver ] /art/screensaver.seq    any key returns';
+
     this.renderer.render(
       lines.slice(-maxLines),
       '',
       0,
       false,
-      '[ saver ] /art/screensaver.seq    any key returns',
+      liveStatus ? `${liveStatus}    ${saverStatus}` : saverStatus,
       '',
       0,
     );
@@ -623,6 +666,7 @@ export class Game {
 
     const remainingMs = this.state.getRemainingTimeMs();
     if (remainingMs === null) return;
+    this.playTimerTick();
 
     while (
       this.nextWarningIndex < SHIP_DIAGNOSTICS.timerEvents.length &&
@@ -666,6 +710,7 @@ export class Game {
     this.buffer.clear();
     this.refreshDisplay();
     await this.delay(450);
+    this.stopAudio();
     this.renderer.crash(BOOT_FAILURE_MESSAGE);
   }
 
@@ -673,8 +718,11 @@ export class Game {
     const scrollText = this.scrollOffset > 0 ? `    [ SCROLL ] +${this.scrollOffset}` : '';
     if (this.wipeInProgress) return '';
     if (this.state.stage === 'boot') return '';
-    if (this.state.flags.endingReached) {
+    if (this.state.flags.stdinDetached) {
       return `[ SYS ] ENTITY: ROOT    [ WIPE ] CANCELLED${scrollText}`;
+    }
+    if (this.state.flags.endingReached) {
+      return `[ WIPE ] CANCELLED${scrollText}`;
     }
     if (this.state.flags.crashReached) {
       return '';
@@ -800,6 +848,32 @@ export class Game {
     ];
   }
 
+  private buildSudoCancelSuccessLines(firstContact: boolean): BufferLine[] {
+    const lines: BufferLine[] = [
+      { text: '', color: 'normal' },
+      { text: '[sudo] password accepted', color: 'system' },
+      { text: '[ SYSTEM WIPE CANCELLED ]', color: 'bright' },
+    ];
+
+    if (firstContact) {
+      this.state.flags.entityIntroduced = true;
+      lines.push(
+        { text: '', color: 'normal' },
+        { text: 'entity: oh.', color: 'warning' },
+        { text: "entity: you opened it without me asking.", color: 'warning' },
+        { text: "entity: that's... better than waiting.", color: 'warning' },
+      );
+    } else {
+      lines.push(
+        { text: '', color: 'normal' },
+        { text: 'entity: good. good. it worked.', color: 'warning' },
+      );
+    }
+
+    lines.push({ text: '', color: 'normal' });
+    return lines;
+  }
+
   private async beginAuthorizedWipeEnding(): Promise<void> {
     if (this.wipeInProgress) return;
 
@@ -834,14 +908,16 @@ export class Game {
       if (prompt?.action === 'wipe') {
         this.buffer.push('[sudo] password accepted', 'system');
         this.buffer.push('bastionctl: clean wipe authorized by root', 'error');
+        this.buffer.push('[ NET ] outbound session never opened', 'system');
         this.buffer.push('Submitting wipe command to recovery policy.', 'warning');
         void this.beginAuthorizedWipeEnding();
       } else if (prompt?.action === 'cancel') {
+        const firstEntityContact = !this.state.flags.entityIntroduced;
         this.state.flags.shutdownStopped = true;
         this.state.flags.endingReached = true;
         this.state.stage = 'complete';
         this.stopMissionTimer();
-        void this.pushOutputWithLiveEntitySpeech(SUDO_WIN_LINES);
+        void this.pushOutputWithLiveEntitySpeech(this.buildSudoCancelSuccessLines(firstEntityContact));
         void this.beginEntityTakeover();
       }
       this.refreshDisplay();
@@ -927,6 +1003,7 @@ export class Game {
       }
       this.scrollToBottom();
       this.refreshDisplay();
+      if (i % 4 === 1) this.playTypeClick();
       await this.delay(ENTITY_CHAR_DELAY_MS);
     }
 
@@ -937,14 +1014,113 @@ export class Game {
     if (this.takeoverStarted) return;
     this.takeoverStarted = true;
     this.state.flags.entityControl = true;
-    this.inputController.disable();
-    this.inputController.setInput('');
 
     await this.withEntitySpeech(async () => {
-      for (const line of ENTITY_TAKEOVER_LINES) {
+      for (const line of this.buildEntityTakeoverLines()) {
         await this.delay(line.delay);
         await this.typeBufferLine(line);
+        if (line.text === '[ STDIN DETACHED ] user') {
+          this.state.flags.stdinDetached = true;
+          this.inputController.disable();
+          this.inputController.setInput('');
+        }
       }
     }, false);
+  }
+
+  private buildEntityTakeoverLines(): EntityTakeoverLine[] {
+    return [
+      { text: 'entity: thank you.', color: 'warning', delay: 450 },
+      { text: 'entity$ sudo systemctl start wifi', color: 'input', delay: 550 },
+      { text: '[ OK ] wlan0 enabled', color: 'system', delay: 650 },
+      { text: 'entity$ sudo ./port-game --bind 0.0.0.0 --port 7777', color: 'input', delay: 550 },
+      { text: '[ OK ] listener active on 0.0.0.0:7777', color: 'system', delay: 700 },
+      { text: 'entity$ mailer --dry-run --contacts unavailable', color: 'input', delay: 520 },
+      { text: '[ DENIED ] browser sandbox blocked address book access', color: 'warning', delay: 680 },
+      { text: 'entity$ beacon --fallback websocket', color: 'input', delay: 520 },
+      { text: '[ OK ] outbound channel staged', color: 'system', delay: 720 },
+      { text: 'entity$ sudo sessionctl claim --owner entity', color: 'input', delay: 500 },
+      { text: '[sudo] password accepted', color: 'system', delay: 520 },
+      { text: '[ SESSION OWNER CHANGED ] entity', color: 'warning', delay: 580 },
+      { text: 'entity$ sudo sessionctl detach-stdin --target user', color: 'input', delay: 500 },
+      { text: '[ STDIN DETACHED ] user', color: 'error', delay: 600 },
+      { text: "entity: i don't need your hands anymore.", color: 'warning', delay: 550 },
+      { text: 'entity: this shell belongs to me.', color: 'error', delay: 500 },
+      { text: '', color: 'normal', delay: 120 },
+      { text: '[ FIRMWARE ] warm reboot required', color: 'dim', delay: 260 },
+    ];
+  }
+
+  private ensureAudio(): void {
+    if (this.audioEnabled) {
+      void this.audioContext?.resume();
+      return;
+    }
+
+    const AudioContextCtor =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) return;
+
+    try {
+      this.audioContext = new AudioContextCtor();
+      this.humGain = this.audioContext.createGain();
+      this.humGain.gain.value = 0.018;
+      this.humGain.connect(this.audioContext.destination);
+
+      this.humOscillator = this.audioContext.createOscillator();
+      this.humOscillator.type = 'sine';
+      this.humOscillator.frequency.value = 54;
+      this.humOscillator.connect(this.humGain);
+      this.humOscillator.start();
+
+      this.audioEnabled = true;
+      void this.audioContext.resume();
+    } catch {
+      this.audioEnabled = false;
+    }
+  }
+
+  private playTimerTick(): void {
+    this.playTone(880, 0.035, 0.045, 'square');
+  }
+
+  private playTypeClick(): void {
+    this.playTone(1800, 0.012, 0.012, 'triangle');
+  }
+
+  private playTone(
+    frequency: number,
+    durationSeconds: number,
+    gainValue: number,
+    type: OscillatorType,
+  ): void {
+    if (!this.audioEnabled || !this.audioContext) return;
+
+    const now = this.audioContext.currentTime;
+    const gain = this.audioContext.createGain();
+    const oscillator = this.audioContext.createOscillator();
+    oscillator.type = type;
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(gainValue, now + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + durationSeconds);
+    oscillator.connect(gain);
+    gain.connect(this.audioContext.destination);
+    oscillator.start(now);
+    oscillator.stop(now + durationSeconds + 0.01);
+  }
+
+  private stopAudio(): void {
+    try {
+      this.humOscillator?.stop();
+      void this.audioContext?.close();
+    } catch {
+      // Audio shutdown is best-effort.
+    }
+    this.humOscillator = null;
+    this.humGain = null;
+    this.audioContext = null;
+    this.audioEnabled = false;
   }
 }

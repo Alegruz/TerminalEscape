@@ -2,6 +2,7 @@ import type { ParsedCommand } from '../terminal/CommandParser.ts';
 import type { CommandContext, OutputLine } from '../terminal/CommandRegistry.ts';
 import { out } from '../terminal/CommandRegistry.ts';
 import { getCommandHelp, getVisibleCommandCatalog } from './CommandCatalog.ts';
+import type { CommandCatalogEntry } from './CommandCatalog.ts';
 
 export function helpCommand(
   cmd: ParsedCommand,
@@ -30,7 +31,7 @@ export function helpCommand(
     out('Available commands:', 'bright'),
     out(''),
   ];
-  for (const info of getVisibleCommandCatalog(ctx.state)) {
+  for (const info of orderCommandsForState(getVisibleCommandCatalog(ctx.state), ctx)) {
     lines.push(out(`  ${info.name.padEnd(10)} ${info.description}`, 'normal'));
   }
   lines.push(out(''));
@@ -41,6 +42,7 @@ export function helpCommand(
     lines.push(out('  shutdown --cancel', 'normal'));
     lines.push(out('  sudo shutdown --cancel', 'normal'));
     lines.push(out('Use the normal shutdown request first; sudo requires a password.', 'dim'));
+    lines.push(out('Idle display process remains available: screensaver', 'dim'));
   } else if (!ctx.state.flags.helpSeen) {
     ctx.state.flags.helpSeen = true;
     lines.push(out(''));
@@ -52,4 +54,20 @@ export function helpCommand(
   }
   lines.push(out(''));
   return lines;
+}
+
+function orderCommandsForState(
+  commands: CommandCatalogEntry[],
+  ctx: CommandContext,
+): CommandCatalogEntry[] {
+  const order = ctx.state.flags.timerStarted && !ctx.state.flags.shutdownStopped
+    ? ['shutdown', 'sudo', 'analyze', 'decrypt', 'screensaver', 'ls', 'cat', 'cd', 'help', 'tiles']
+    : ['help', 'tiles', 'screensaver', 'ls', 'cat', 'cd', 'analyze', 'decrypt', 'shutdown', 'sudo'];
+  const rank = new Map(order.map((name, index) => [name, index]));
+
+  return [...commands].sort((a, b) => {
+    const rankA = rank.get(a.name) ?? Number.MAX_SAFE_INTEGER;
+    const rankB = rank.get(b.name) ?? Number.MAX_SAFE_INTEGER;
+    return rankA - rankB || a.name.localeCompare(b.name);
+  });
 }
