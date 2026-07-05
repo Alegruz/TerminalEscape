@@ -57,7 +57,7 @@ const BOOT_LINES: BootLine[] = [
 const TIMER_TICK_MS = 1000;
 const WIPE_LINE_DELAY_MS = 90;
 const IDLE_SCREENSAVER_DELAY_MS = 30_000;
-const SCREENSAVER_FRAME_MS = 360;
+const SCREENSAVER_FRAME_MS = 700;
 const ENTITY_CHAR_DELAY_MS = 28;
 const ENTITY_LINE_PAUSE_MS = 420;
 const PASSIVE_SECURITY_TRIGGER_COMMANDS = 6;
@@ -544,35 +544,29 @@ export class Game {
   private renderScreensaverFrame(): void {
     const frames = this.getScreensaverFrames();
     const frame = frames[this.screensaverFrameIndex % frames.length] ?? [];
-    const maxLines = this.computeMaxVisibleLines();
-    const topPadding = Math.max(0, Math.floor((maxLines - frame.length) / 2));
-    const drift = this.screensaverFrameIndex % 12;
-    const indent = ' '.repeat(drift <= 6 ? drift : 12 - drift);
     const lines: BufferLine[] = [];
 
-    for (let i = 0; i < topPadding; i++) {
-      lines.push({ text: '', color: 'normal' });
-    }
     for (const text of frame) {
       const color: TextColor = text.includes('BASTIONOS')
         ? 'bright'
         : text.includes('source:')
           ? 'dim'
           : 'normal';
-      lines.push({ text: text.length > 0 ? indent + text : '', color });
+      lines.push({ text, color });
     }
 
     const liveStatus = this.buildLiveStatusLine();
     const saverStatus = '[ saver ] /art/screensaver.seq    any key returns';
 
     this.renderer.render(
-      lines.slice(-maxLines),
+      lines,
       '',
       0,
       false,
       liveStatus ? `${liveStatus}    ${saverStatus}` : saverStatus,
       '',
       0,
+      'screensaver',
     );
   }
 
@@ -580,9 +574,10 @@ export class Game {
     if (this.screensaverFrames !== null) return this.screensaverFrames;
 
     const source = this.vfs.readFile('/art/screensaver.seq') ?? 'BASTIONOS\nstandby';
-    this.screensaverFrames = source
-      .split(/\n---\n/g)
-      .map(frame => frame.replace(/\s+$/g, '').split('\n'));
+    const frames = source
+      .split(/\r?\n---\r?\n/g)
+      .map(frame => frame.replace(/\s+$/g, '').split(/\r?\n/g));
+    this.screensaverFrames = frames;
 
     return this.screensaverFrames.length > 0 ? this.screensaverFrames : [['BASTIONOS', 'standby']];
   }

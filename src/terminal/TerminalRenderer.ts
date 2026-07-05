@@ -9,6 +9,8 @@ import {
 import { THEME, colorForType } from '../style/theme.ts';
 import type { BufferLine } from './TerminalBuffer.ts';
 
+type OutputMode = 'normal' | 'screensaver';
+
 export class TerminalRenderer {
   private app!: Application;
   private outputContainer!: Container;
@@ -38,6 +40,7 @@ export class TerminalRenderer {
   private lastCursorPos = -1;
   private lastStatusLine = '';
   private lastPrompt = '';
+  private lastOutputMode: OutputMode = 'normal';
   private lastScreenWidth = 0;
   private lastScreenHeight = 0;
   private characterWidth: number | null = null;
@@ -193,6 +196,7 @@ export class TerminalRenderer {
     statusLine: string,
     prompt: string,
     instability: number = 0,
+    outputMode: OutputMode = 'normal',
   ): void {
     if (this.crashed) return;
 
@@ -205,7 +209,8 @@ export class TerminalRenderer {
       cursorPos !== this.lastCursorPos ||
       statusLine !== this.lastStatusLine ||
       prompt !== this.lastPrompt ||
-      normalizedInstability !== this.instability;
+      normalizedInstability !== this.instability ||
+      outputMode !== this.lastOutputMode;
 
     if (changed) {
       this.lastLines = visibleLines;
@@ -213,6 +218,7 @@ export class TerminalRenderer {
       this.lastCursorPos = cursorPos;
       this.lastStatusLine = statusLine;
       this.lastPrompt = prompt;
+      this.lastOutputMode = outputMode;
       this.instability = normalizedInstability;
       this.markDirty();
     }
@@ -224,6 +230,7 @@ export class TerminalRenderer {
     this._pendingInputEnabled = inputEnabled;
     this._pendingStatusLine = statusLine;
     this._pendingPrompt = prompt;
+    this._pendingOutputMode = outputMode;
   }
 
   private wrapVisibleLines(lines: BufferLine[]): BufferLine[] {
@@ -278,6 +285,7 @@ export class TerminalRenderer {
   private _pendingInputEnabled: boolean = false;
   private _pendingStatusLine: string = '';
   private _pendingPrompt: string = '';
+  private _pendingOutputMode: OutputMode = 'normal';
 
   private repaint(): void {
     const lines = this.wrapVisibleLines(this._pendingLines);
@@ -286,23 +294,26 @@ export class TerminalRenderer {
     const inputEnabled = this._pendingInputEnabled;
     const statusLine = this._pendingStatusLine;
     const prompt = this._pendingPrompt;
+    const outputMode = this._pendingOutputMode;
 
     const maxOutputLines = this.maxOutputLines;
     this.ensureOutputTextCount(maxOutputLines);
 
-    // Output lines.
-    for (let i = 0; i < maxOutputLines; i++) {
-      const textObj = this.outputTexts[i];
-      const line = lines[i];
-      if (line) {
-        textObj.text = line.text;
-        (textObj.style as TextStyle).fill = colorForType(line.color);
-      } else {
-        textObj.text = '';
-      }
+    for (const textObj of this.outputTexts) {
+      textObj.text = '';
     }
-    for (let i = maxOutputLines; i < this.outputTexts.length; i++) {
-      this.outputTexts[i].text = '';
+
+    const visibleLines = lines.slice(-maxOutputLines);
+    const startLine = outputMode === 'screensaver'
+      ? Math.max(0, Math.floor((maxOutputLines - visibleLines.length) / 2))
+      : 0;
+
+    // Output lines.
+    for (let i = 0; i < visibleLines.length && startLine + i < maxOutputLines; i++) {
+      const textObj = this.outputTexts[startLine + i];
+      const line = visibleLines[i];
+      textObj.text = line.text;
+      (textObj.style as TextStyle).fill = colorForType(line.color);
     }
 
     // Input / prompt line at the bottom of the canvas.
