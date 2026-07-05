@@ -2,7 +2,8 @@
 
 A browser terminal escape game about an entity trapped in a host recovery shell.
 
-The host boots, starts a shutdown countdown, and tells the player to run `help`.
+The host boots into a recovery shell, then a security violation can arm a clean
+system wipe countdown.
 The player must:
 
 1. Read the entity guidance.

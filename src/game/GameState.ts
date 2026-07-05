@@ -2,7 +2,7 @@ export class GameState {
   /** Lifecycle stage of the game. */
   stage: 'boot' | 'play' | 'complete' | 'failed' = 'boot';
 
-  /** Epoch timestamp when the host shutdown countdown reaches zero. */
+  /** Epoch timestamp when the host wipe countdown reaches zero. */
   missionEndsAt: number | null = null;
   missionTimerSpeed = 1;
   private missionTimerUpdatedAt: number | null = null;
@@ -19,9 +19,16 @@ export class GameState {
 
   /** Index into commandHistory while navigating with ArrowUp/Down; -1 = not navigating. */
   historyIndex: number = -1;
+  submittedCommandCount = 0;
+  invalidCommandCount = 0;
+  tilesMoveCount = 0;
 
   flags = {
     helpSeen: false,
+    tilesStarted: false,
+    timerStarted: false,
+    tilesCrashed: false,
+    entityIntroduced: false,
     logDecrypted: false,
     shutdownStopped: false,
     entityControl: false,

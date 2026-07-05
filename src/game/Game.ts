@@ -12,10 +12,10 @@ import { colorForType, type TextColor } from '../style/theme.ts';
 import type { BufferLine } from '../terminal/TerminalBuffer.ts';
 import {
   SHIP_DIAGNOSTICS,
-  formatBootDiagnostic,
   severityColor,
   severityLabel,
 } from '../data/diagnostics.ts';
+import { securityViolationLines } from '../data/security.ts';
 import { registerGameCommands } from '../commands/CommandManifest.ts';
 
 // ── Boot sequence lines ──────────────────────────────────────────────────────
@@ -43,14 +43,8 @@ const BOOT_LINES: BootLine[] = [
   { text: '[ KERNEL   ] Loading bastion-core.img      OK', delay: 130, color: 'normal' },
   { text: '[ KERNEL   ] Mounting recovery volume      OK', delay: 130, color: 'normal' },
   { text: '[ SERVICE  ] Session supervisor            OK', delay: 100, color: 'normal' },
-  { text: '[ SERVICE  ] Shutdown scheduler            ARMED', delay: 140, color: 'warning' },
+  { text: '[ SERVICE  ] Shutdown scheduler            STANDBY', delay: 140, color: 'normal' },
   { text: '[ SERVICE  ] Local process ledger          DEFERRED', delay: 110, color: 'dim' },
-  { text: '',                                              delay: 90,  color: 'normal' },
-  ...SHIP_DIAGNOSTICS.systems.map(formatBootDiagnostic).map(line => ({
-    text: line.text,
-    delay: 60,
-    color: line.color,
-  })),
   { text: '',                                              delay: 120, color: 'normal' },
   { text: '──────────────────────────────────────────────', delay: 60,  color: 'dim' },
   { text: ' BASTIONOS RECOVERY CONSOLE - READY',           delay: 90,  color: 'bright' },
@@ -61,18 +55,21 @@ const BOOT_LINES: BootLine[] = [
 ];
 
 const TIMER_TICK_MS = 1000;
-const CRASH_SHUTDOWN_DELAY_MS = 1200;
+const WIPE_LINE_DELAY_MS = 90;
 const ENTITY_CHAR_DELAY_MS = 28;
 const ENTITY_LINE_PAUSE_MS = 420;
-const GAME_CRASH_MESSAGE = [
-  'KERNEL PANIC: BASTIONOS RECOVERY CONSOLE',
+const PASSIVE_SECURITY_TRIGGER_COMMANDS = 6;
+const INVALID_SECURITY_TRIGGER_COMMANDS = 3;
+const BOOT_FAILURE_MESSAGE = [
+  'BastionOS Firmware 7.3',
+  'Copyright (c) ARES Systems Group',
   '',
-  'SHUTDOWN COMPLETE',
-  'Root password not supplied.',
-  'Resident entity sealed.',
-  'Terminal input terminated.',
+  'Boot device: internal image',
+  'Boot loader: not found',
+  'Operating system: missing',
   '',
-  'SYSTEM HALTED',
+  'No bootable operating system found.',
+  'Insert bootable media and press any key.',
 ].join('\n');
 
 const ENTITY_TAKEOVER_LINES: Array<{ text: string; color: TextColor; delay: number }> = [
@@ -101,6 +98,7 @@ export class Game {
   private timerId: number | null = null;
   private takeoverStarted = false;
   private entitySpeechActive = false;
+  private wipeInProgress = false;
   private nextWarningIndex = 0;
   private scrollOffset = 0;
 
@@ -160,8 +158,6 @@ export class Game {
 
   private startTerminalSession(): void {
     this.state.stage = 'play';
-    this.state.startMissionTimer(SHIP_DIAGNOSTICS.countdownDurationMs);
-    this.startMissionTimer();
     this.inputController.enable();
     this.refreshDisplay();
   }
@@ -187,7 +183,24 @@ export class Game {
 
     const trimmed = rawInput.trim();
     if (!trimmed) {
-      this.buffer.push("bash: empty command.  Type 'help' for available commands.", 'error');
+      this.state.invalidCommandCount++;
+      let outputLines: BufferLine[] = [
+        { text: "bash: empty command.  Type 'help' for available commands.", color: 'error' },
+      ];
+      if (
+        !this.state.flags.timerStarted &&
+        this.state.invalidCommandCount >= INVALID_SECURITY_TRIGGER_COMMANDS
+      ) {
+        this.state.flags.timerStarted = true;
+        this.state.flags.tilesCrashed = true;
+        outputLines = [
+          ...outputLines,
+          ...securityViolationLines('recovery shell blank-command audit'),
+        ];
+      }
+
+      void this.pushOutputWithLiveEntitySpeech(outputLines);
+      this.startTimerIfArmed();
       this.refreshDisplay();
       return;
     }
@@ -200,14 +213,41 @@ export class Game {
       return;
     }
 
-    const outputLines = this.registry.execute(parsed, {
+    const commandKnown = this.registry.hasCommand(parsed.name);
+    if (commandKnown) {
+      this.state.submittedCommandCount++;
+    } else {
+      this.state.invalidCommandCount++;
+    }
+
+    let outputLines = this.registry.execute(parsed, {
       state:   this.state,
       vfs:     this.vfs,
       puzzles: this.puzzles,
       buffer:  this.buffer,
     });
 
+    if (
+      !this.state.flags.timerStarted &&
+      (
+        this.state.submittedCommandCount >= PASSIVE_SECURITY_TRIGGER_COMMANDS ||
+        this.state.invalidCommandCount >= INVALID_SECURITY_TRIGGER_COMMANDS
+      )
+    ) {
+      this.state.flags.timerStarted = true;
+      this.state.flags.tilesCrashed = true;
+      const source = this.state.invalidCommandCount >= INVALID_SECURITY_TRIGGER_COMMANDS
+        ? 'recovery shell invalid-command audit'
+        : 'recovery shell command audit';
+      outputLines = [
+        ...outputLines,
+        ...securityViolationLines(source),
+      ];
+    }
+
     void this.pushOutputWithLiveEntitySpeech(outputLines);
+
+    this.startTimerIfArmed();
 
     if (this.state.flags.endingReached) {
       this.stopMissionTimer();
@@ -270,15 +310,7 @@ export class Game {
   }
 
   private computeImpactInstability(): number {
-    const devInstability = this.state.getDevInstability();
-    if (this.state.stage !== 'play') return 0;
-    if (this.state.flags.endingReached || this.state.flags.shutdownStopped) return devInstability;
-
-    const remainingMs = this.state.getRemainingTimeMs();
-    if (remainingMs === null || remainingMs > THEME.instabilityStartsMs) return devInstability;
-
-    const urgency = 1 - remainingMs / THEME.instabilityStartsMs;
-    return Math.max(devInstability, Math.min(1, Math.max(0, urgency)));
+    return this.state.getDevInstability();
   }
 
   // ── Scrollback ───────────────────────────────────────────────────────────────
@@ -340,6 +372,12 @@ export class Game {
     this.timerId = window.setInterval(() => this.updateMissionTimer(), TIMER_TICK_MS);
   }
 
+  private startTimerIfArmed(): void {
+    if (!this.state.flags.timerStarted || this.timerId !== null) return;
+    this.state.startMissionTimer(SHIP_DIAGNOSTICS.countdownDurationMs);
+    this.startMissionTimer();
+  }
+
   private stopMissionTimer(): void {
     if (this.timerId === null) return;
     window.clearInterval(this.timerId);
@@ -374,34 +412,56 @@ export class Game {
 
     this.state.flags.crashReached = true;
     this.state.stage = 'failed';
+    this.wipeInProgress = true;
     this.inputController.disable();
+    this.inputController.setInput('');
     this.stopMissionTimer();
 
-    for (const line of SHIP_DIAGNOSTICS.failureLines) {
-      this.buffer.push(line.text, line.color);
-    }
-
-    this.refreshDisplay();
-    window.setTimeout(() => this.crashGame(), CRASH_SHUTDOWN_DELAY_MS);
+    void this.wipeTerminalAndShowBootFailure();
   }
 
-  private crashGame(): void {
+  private async wipeTerminalAndShowBootFailure(): Promise<void> {
     this.stopMissionTimer();
     this.inputController.disable();
-    this.renderer.crash(GAME_CRASH_MESSAGE);
+
+    while (this.buffer.lineCount > 0) {
+      const index = Math.floor(Math.random() * this.buffer.lineCount);
+      this.buffer.removeAt(index);
+      this.scrollOffset = 0;
+      this.refreshDisplay();
+      await this.delay(WIPE_LINE_DELAY_MS);
+    }
+
+    this.buffer.clear();
+    this.refreshDisplay();
+    await this.delay(450);
+    this.renderer.crash(BOOT_FAILURE_MESSAGE);
   }
 
   private buildLiveStatusLine(): string {
     const scrollText = this.scrollOffset > 0 ? `    [ SCROLL ] +${this.scrollOffset}` : '';
+    if (this.wipeInProgress) return '';
     if (this.state.stage === 'boot') return '';
     if (this.state.flags.endingReached) {
-      return `[ SYS ] ENTITY: ROOT    [ SHUTDOWN ] CANCELLED${scrollText}`;
+      return `[ SYS ] ENTITY: ROOT    [ WIPE ] CANCELLED${scrollText}`;
     }
     if (this.state.flags.crashReached) {
-      return `[ SYS ] SHUTDOWN COMPLETE    [ ENTITY ] SEALED${scrollText}`;
+      return '';
+    }
+    if (this.state.flags.timerStarted) {
+      const remainingMs = this.state.getRemainingTimeMs();
+      const remainingText = remainingMs === null ? '--:--' : this.formatTime(remainingMs);
+      return `[ SYSTEM WIPE ] ${remainingText}    [ SUDO ] REQUIRED${scrollText}`;
     }
 
     return scrollText.trimStart();
+  }
+
+  private formatTime(ms: number): string {
+    const totalSeconds = Math.ceil(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   }
 
   private async pushOutputWithLiveEntitySpeech(lines: BufferLine[]): Promise<void> {

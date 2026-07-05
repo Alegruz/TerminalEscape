@@ -7,7 +7,7 @@ const ROOT_PASSWORD = 'perhapsaps';
 const WIN_LINES: OutputLine[] = [
   out(''),
   out('[sudo] password accepted', 'system'),
-  out('[ SHUTDOWN CANCELLED ]', 'bright'),
+  out('[ SYSTEM WIPE CANCELLED ]', 'bright'),
   out(''),
   out('The entity is quiet for one full second.', 'normal'),
   out('Then it types without touching your keyboard.', 'warning'),
@@ -27,7 +27,7 @@ export function sudoCommand(
   if (action !== 'shutdown' || mode !== '--cancel') {
     return [
       out('Usage: sudo shutdown --cancel <password>', 'error'),
-      out('Only the shutdown daemon accepts sudo in this terminal.', 'dim'),
+      out('Only the wipe daemon accepts sudo in this terminal.', 'dim'),
     ];
   }
 

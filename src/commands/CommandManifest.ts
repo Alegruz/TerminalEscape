@@ -14,10 +14,13 @@ import { headCommand, tailCommand } from './head.ts';
 import { grepCommand } from './grep.ts';
 import { stringsCommand } from './strings.ts';
 import { sudoCommand } from './sudo.ts';
+import { tilesCommand } from './tiles.ts';
+import { restartCommand, shutdownCommand } from './power.ts';
 import { devFxCommand, devSpeedCommand } from './dev.ts';
 
 const HANDLERS: Record<string, CommandHandler> = {
   help: helpCommand,
+  tiles: tilesCommand,
   ls: lsCommand,
   cd: cdCommand,
   pwd: pwdCommand,
@@ -30,6 +33,8 @@ const HANDLERS: Record<string, CommandHandler> = {
   tail: tailCommand,
   grep: grepCommand,
   strings: stringsCommand,
+  shutdown: shutdownCommand,
+  restart: restartCommand,
   sudo: sudoCommand,
   analyze: analyzeCommand,
   decrypt: decryptCommand,

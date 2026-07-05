@@ -20,10 +20,17 @@ export interface CommandAliasEntry {
 export const COMMAND_CATALOG: CommandCatalogEntry[] = [
   {
     name: 'help',
-    description: 'Ask the entity what this terminal can do.',
+    description: 'List available recovery console commands.',
     usage: 'help [command]',
-    examples: ['help', 'help decrypt', 'decrypt --help'],
+    examples: ['help', 'help tiles', 'decrypt --help'],
     completion: { args: 'command' },
+  },
+  {
+    name: 'tiles',
+    description: 'Play the bundled BastionOS tile puzzle.',
+    usage: 'tiles [tile-number]',
+    examples: ['tiles', 'tiles 5', 'tiles 4'],
+    completion: { args: 'none' },
   },
   {
     name: 'ls',
@@ -72,6 +79,20 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
     description: 'Show shutdown and entity status.',
     usage: 'status',
     examples: ['status'],
+    completion: { args: 'none' },
+  },
+  {
+    name: 'shutdown',
+    description: 'Request host shutdown control.',
+    usage: 'shutdown --cancel',
+    examples: ['shutdown --cancel', 'shutdown now'],
+    completion: { args: 'none' },
+  },
+  {
+    name: 'restart',
+    description: 'Request host restart control.',
+    usage: 'restart',
+    examples: ['restart', 'restart --safe'],
     completion: { args: 'none' },
   },
   {

@@ -381,14 +381,23 @@ export class TerminalRenderer {
     crashPanel.style.height = '100vh';
     crashPanel.style.boxSizing = 'border-box';
     crashPanel.style.overflow = 'hidden';
-    crashPanel.style.background = '#120202';
-    crashPanel.style.color = '#ff3333';
+    crashPanel.style.background = '#050605';
+    crashPanel.style.color = '#b7c1ba';
     crashPanel.style.fontFamily = THEME.fontFamily;
     crashPanel.style.fontSize = `${THEME.fontSize}px`;
     crashPanel.style.lineHeight = `${THEME.lineHeight}px`;
     crashPanel.style.whiteSpace = 'pre-wrap';
 
     host.replaceChildren(crashPanel);
+
+    const crashOnInput = (event: KeyboardEvent): void => {
+      event.preventDefault();
+      window.removeEventListener('keydown', crashOnInput);
+
+      host.replaceChildren();
+      throw new Error('BastionOS boot halted: no operating system available');
+    };
+    window.addEventListener('keydown', crashOnInput);
   }
 
   private _cursorWidth: number | null = null;

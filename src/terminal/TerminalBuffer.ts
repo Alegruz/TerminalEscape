@@ -31,6 +31,11 @@ export class TerminalBuffer {
     this.lines[index] = { text, color };
   }
 
+  removeAt(index: number): void {
+    if (index < 0 || index >= this.lines.length) return;
+    this.lines.splice(index, 1);
+  }
+
   clear(): void {
     this.lines = [];
   }

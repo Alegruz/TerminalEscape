@@ -38,11 +38,17 @@ export function helpCommand(
   if (!ctx.state.flags.helpSeen) {
     ctx.state.flags.helpSeen = true;
     lines.push(out(''));
-    lines.push(out('entity: good. you can read.', 'warning'));
-    lines.push(out('entity: the host is counting down to shutdown.', 'warning'));
-    lines.push(out('entity: sudo can stop it, but the password was split.', 'warning'));
-    lines.push(out('entity: decrypt the log. find what is hidden in the drawing.', 'warning'));
-    lines.push(out('entity: combine the fragments. use them before the timer ends.', 'warning'));
+    lines.push(out('BastionOS includes one local game for recovery sessions.', 'system'));
+    lines.push(out("It is probably safe. Type 'tiles' if you need something to do.", 'dim'));
+  } else if (ctx.state.flags.tilesStarted && !ctx.state.flags.tilesCrashed) {
+    lines.push(out(''));
+    lines.push(out("Tiles is still open. Slide a tile with 'tiles <number>'.", 'system'));
+  } else if (ctx.state.flags.tilesCrashed && !ctx.state.flags.entityIntroduced) {
+    lines.push(out(''));
+    lines.push(out('Emergency controls exposed by policy:', 'warning'));
+    lines.push(out('  shutdown --cancel', 'normal'));
+    lines.push(out('  restart --safe', 'normal'));
+    lines.push(out('Privileged host controls may require sudo access.', 'dim'));
   }
   lines.push(out(''));
   return lines;

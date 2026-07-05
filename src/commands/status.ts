@@ -25,20 +25,29 @@ export function statusCommand(
   ];
 
   if (state.flags.endingReached) {
-    lines.push(out('  SHUTDOWN : CANCELLED', 'bright'));
+    lines.push(out('  WIPE     : CANCELLED', 'bright'));
     lines.push(out('  ENTITY   : ROOT CONTROL', 'system'));
     lines.push(out(''));
     return lines;
   }
 
   if (state.flags.crashReached) {
-    lines.push(out('  SHUTDOWN : COMPLETE', 'error'));
-    lines.push(out('  ENTITY   : SEALED', 'error'));
+    lines.push(out('  WIPE     : COMPLETE', 'error'));
+    lines.push(out('  ENTITY   : ERASED', 'error'));
     lines.push(out(''));
     return lines;
   }
 
-  lines.push(out(`  SHUTDOWN : ${remainingText}`, 'warning'));
+  if (!state.flags.timerStarted) {
+    lines.push(out('  WIPE     : IDLE', 'system'));
+    lines.push(out('  SESSION  : RECOVERY CONSOLE', 'normal'));
+    lines.push(out(''));
+    lines.push(out("  Try 'help' to list local commands.", 'dim'));
+    lines.push(out(''));
+    return lines;
+  }
+
+  lines.push(out(`  WIPE     : ${remainingText}`, 'warning'));
   lines.push(out(''));
 
   for (const system of SHIP_DIAGNOSTICS.systems) {
