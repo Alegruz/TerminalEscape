@@ -1,42 +1,33 @@
 # Terminal Escape
 
-A browser terminal escape game about an entity trapped in a host recovery shell.
+A short browser terminal game about a recovery shell, a hostile wipe daemon, and
+something in the machine that does not want to disappear.
 
-The host boots into a recovery shell, then a security violation can arm a clean
-system wipe countdown.
-The player must:
+The game is played entirely through typed commands. Read what the terminal gives
+you, inspect files, try tools, and pay attention to processes that keep running
+when you stop typing.
 
-1. Read the entity guidance.
-2. Decrypt `/logs/shutdown.log.enc`.
-3. Follow the idle-art riddle for the other fragment.
-4. Combine the fragments into the sudo password.
-5. Run `sudo shutdown --cancel`, then enter the recovered password before the timer reaches zero.
+## Play
 
-After the correct sudo command, the shutdown stops, the entity thanks the player,
-then it starts typing its own commands. Player input is disabled while the entity
-enables Wi-Fi and starts the port game listener.
-
-## Commands
-
-Core commands include:
+Start with:
 
 ```sh
 help
-tiles
-cd /logs
-screensaver
-shutdown --cancel
-ls /logs
-ls -a /logs
-analyze /logs/shutdown.log.enc
-decrypt --method caesar --key <number> /logs/shutdown.log.enc
-screensaver
-sudo shutdown --cancel
-sudo shutdown --wipe
+ls
+cat readme.txt
 ```
 
-`sudo shutdown --wipe` is a destructive branch. If authorized, the terminal is
-erased and the host falls through to the boot failure screen.
+Useful terminal habits:
+
+- Paths can be relative, such as `logs/file.txt`, or absolute, such as
+  `/logs/file.txt`.
+- `Tab` attempts command or path completion.
+- `Up` and `Down` move through command history.
+- `Ctrl+Left` and `Ctrl+Right` move by word.
+- `Shift` with movement keys selects input text.
+
+The terminal includes analysis and decryption tools, but it will not solve the
+system for you. Treat command output as evidence, not instructions.
 
 ## Development
 
