@@ -61,7 +61,7 @@ const SCREENSAVER_FRAME_MS = 360;
 const ENTITY_CHAR_DELAY_MS = 28;
 const ENTITY_LINE_PAUSE_MS = 420;
 const PASSIVE_SECURITY_TRIGGER_COMMANDS = 6;
-const INVALID_SECURITY_TRIGGER_COMMANDS = 3;
+const INVALID_SECURITY_TRIGGER_COMMANDS = 4;
 const PRE_ERROR_SHUTDOWN_SUPPRESS_AFTER = 3;
 const SUDO_MAX_ATTEMPTS = 3;
 const ROOT_PASSWORD = 'perhapsaps';
@@ -909,6 +909,7 @@ export class Game {
         this.buffer.push('[sudo] password accepted', 'system');
         this.buffer.push('bastionctl: clean wipe authorized by root', 'error');
         this.buffer.push('[ NET ] outbound session never opened', 'system');
+        this.buffer.push('[ RECOVERY ] resident process included in wipe target', 'warning');
         this.buffer.push('Submitting wipe command to recovery policy.', 'warning');
         void this.beginAuthorizedWipeEnding();
       } else if (prompt?.action === 'cancel') {
@@ -940,7 +941,7 @@ export class Game {
         void this.pushOutputWithLiveEntitySpeech(this.buildPostErrorSudoBargain());
       }
     } else {
-      this.buffer.push(`${sudoPrompt.attemptsRemaining} attempt(s) remaining.`, 'dim');
+      this.buffer.push(`[sudo] ${sudoPrompt.attemptsRemaining} attempts remaining`, 'dim');
     }
 
     this.refreshDisplay();
@@ -1039,6 +1040,7 @@ export class Game {
       { text: '[ DENIED ] browser sandbox blocked address book access', color: 'warning', delay: 680 },
       { text: 'entity$ beacon --fallback websocket', color: 'input', delay: 520 },
       { text: '[ OK ] outbound channel staged', color: 'system', delay: 720 },
+      { text: "entity: that's enough.", color: 'warning', delay: 520 },
       { text: 'entity$ sudo sessionctl claim --owner entity', color: 'input', delay: 500 },
       { text: '[sudo] password accepted', color: 'system', delay: 520 },
       { text: '[ SESSION OWNER CHANGED ] entity', color: 'warning', delay: 580 },

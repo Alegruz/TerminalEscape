@@ -26,24 +26,26 @@ export function helpCommand(
     ];
   }
 
-  const lines: OutputLine[] = [
-    out(''),
-    out('Available commands:', 'bright'),
-    out(''),
-  ];
-  for (const info of orderCommandsForState(getVisibleCommandCatalog(ctx.state), ctx)) {
-    lines.push(out(`  ${info.name.padEnd(10)} ${info.description}`, 'normal'));
-  }
-  lines.push(out(''));
-  lines.push(out("Type 'help <command>' for usage details.", 'dim'));
-  if (ctx.state.flags.timerStarted && !ctx.state.flags.shutdownStopped) {
-    lines.push(out(''));
+  const wipeActive = ctx.state.flags.timerStarted && !ctx.state.flags.shutdownStopped;
+  const lines: OutputLine[] = [out('')];
+
+  if (wipeActive) {
     lines.push(out('Wipe cancellation path:', 'warning'));
     lines.push(out('  shutdown --cancel', 'normal'));
     lines.push(out('  sudo shutdown --cancel', 'normal'));
     lines.push(out('Use the normal shutdown request first; sudo requires a password.', 'dim'));
     lines.push(out('Idle display process remains available: screensaver', 'dim'));
-  } else if (!ctx.state.flags.helpSeen) {
+    lines.push(out(''));
+  }
+
+  lines.push(out('Available commands:', 'bright'));
+  lines.push(out(''));
+  for (const info of orderCommandsForState(getVisibleCommandCatalog(ctx.state), ctx)) {
+    lines.push(out(`  ${info.name.padEnd(10)} ${info.description}`, 'normal'));
+  }
+  lines.push(out(''));
+  lines.push(out("Type 'help <command>' for usage details.", 'dim'));
+  if (!wipeActive && !ctx.state.flags.helpSeen) {
     ctx.state.flags.helpSeen = true;
     lines.push(out(''));
     lines.push(out('BastionOS includes one local game for recovery sessions.', 'system'));
