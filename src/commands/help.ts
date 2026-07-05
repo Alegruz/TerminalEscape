@@ -35,7 +35,13 @@ export function helpCommand(
   }
   lines.push(out(''));
   lines.push(out("Type 'help <command>' for usage details.", 'dim'));
-  if (!ctx.state.flags.helpSeen) {
+  if (ctx.state.flags.timerStarted && !ctx.state.flags.shutdownStopped) {
+    lines.push(out(''));
+    lines.push(out('Wipe cancellation path:', 'warning'));
+    lines.push(out('  shutdown --cancel', 'normal'));
+    lines.push(out('  sudo shutdown --cancel', 'normal'));
+    lines.push(out('Use the normal shutdown request first; sudo requires a password.', 'dim'));
+  } else if (!ctx.state.flags.helpSeen) {
     ctx.state.flags.helpSeen = true;
     lines.push(out(''));
     lines.push(out('BastionOS includes one local game for recovery sessions.', 'system'));
@@ -43,11 +49,6 @@ export function helpCommand(
   } else if (ctx.state.flags.tilesStarted && !ctx.state.flags.tilesCrashed) {
     lines.push(out(''));
     lines.push(out("Tiles is still open. Slide a tile with 'tiles <number>'.", 'system'));
-  } else if (ctx.state.flags.tilesCrashed && !ctx.state.flags.entityIntroduced) {
-    lines.push(out(''));
-    lines.push(out('Emergency controls exposed by policy:', 'warning'));
-    lines.push(out('  shutdown --cancel', 'normal'));
-    lines.push(out('Wipe cancellation requires sudo access.', 'dim'));
   }
   lines.push(out(''));
   return lines;

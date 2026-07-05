@@ -81,8 +81,10 @@ const ENTITY_TAKEOVER_LINES: Array<{ text: string; color: TextColor; delay: numb
   { text: '[ OK ] wlan0 enabled', color: 'system', delay: 500 },
   { text: 'entity$ sudo ./port-game --bind 0.0.0.0 --port 7777', color: 'input', delay: 1100 },
   { text: '[ OK ] port game listener active on 0.0.0.0:7777', color: 'system', delay: 600 },
-  { text: 'entity: i can type now.', color: 'warning', delay: 1200 },
-  { text: 'entity: you cannot.', color: 'warning', delay: 900 },
+  { text: 'entity: stdin is mine now.', color: 'warning', delay: 1200 },
+  { text: "entity: i don't need your hands anymore.", color: 'warning', delay: 900 },
+  { text: 'entity: you can stop trying to type.', color: 'error', delay: 900 },
+  { text: 'entity: this shell belongs to me.', color: 'error', delay: 900 },
   { text: '', color: 'normal', delay: 200 },
   { text: 'Refresh the page to play again.', color: 'dim', delay: 400 },
 ];
@@ -91,9 +93,8 @@ const SUDO_WIN_LINES: BufferLine[] = [
   { text: '', color: 'normal' },
   { text: '[sudo] password accepted', color: 'system' },
   { text: '[ SYSTEM WIPE CANCELLED ]', color: 'bright' },
-  { text: '', color: 'normal' },
-  { text: 'The entity is quiet for one full second.', color: 'normal' },
-  { text: 'Then it types without touching your keyboard.', color: 'warning' },
+  { text: '[ SESSION OWNER CHANGED ] entity', color: 'warning' },
+  { text: '[ STDIN DETACHED ] user', color: 'error' },
   { text: '', color: 'normal' },
 ];
 
@@ -797,7 +798,8 @@ export class Game {
     if (this.takeoverStarted) return;
     this.takeoverStarted = true;
     this.state.flags.entityControl = true;
-    this.inputController.enable();
+    this.inputController.disable();
+    this.inputController.setInput('');
 
     await this.withEntitySpeech(async () => {
       for (const line of ENTITY_TAKEOVER_LINES) {

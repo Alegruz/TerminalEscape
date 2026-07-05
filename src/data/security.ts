@@ -15,7 +15,7 @@ export function securityViolationLines(source: string): SecurityViolationLine[] 
     { text: '[ CRIT  ] Clean system wipe policy armed', color: 'error' },
     { text: '[ CRIT  ] Wipe target: userland, logs, resident data, BastionOS image', color: 'error' },
     { text: '', color: 'warning' },
-    { text: "System note: try 'help' for wipe cancellation commands.", color: 'warning' },
+    { text: "System note: request shutdown first. Use: shutdown --cancel", color: 'warning' },
     { text: '', color: 'warning' },
   ];
 }
