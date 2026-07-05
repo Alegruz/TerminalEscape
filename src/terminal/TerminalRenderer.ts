@@ -9,9 +9,6 @@ import {
 import { THEME, colorForType } from '../style/theme.ts';
 import type { BufferLine } from './TerminalBuffer.ts';
 
-/** Max visible text lines (excluding the input row). */
-const MAX_OUTPUT_LINES = 36;
-
 export class TerminalRenderer {
   private app!: Application;
   private outputContainer!: Container;
@@ -25,7 +22,7 @@ export class TerminalRenderer {
   private instability = 0;
   private instabilityTimeMs = 0;
   private glitchHoldMs = 0;
-  private lineJitter: number[] = Array(MAX_OUTPUT_LINES).fill(0);
+  private lineJitter: number[] = [];
 
   /** Controls cursor blink animation. */
   private cursorVisible = true;
@@ -43,6 +40,7 @@ export class TerminalRenderer {
   private lastPrompt = '';
   private lastScreenWidth = 0;
   private lastScreenHeight = 0;
+  private characterWidth: number | null = null;
 
   async init(): Promise<void> {
     this.app = new Application();
@@ -84,13 +82,7 @@ export class TerminalRenderer {
       letterSpacing: 0.5,
     });
 
-    for (let i = 0; i < MAX_OUTPUT_LINES; i++) {
-      const t = new Text({ text: '', style: baseStyle.clone() });
-      t.x = THEME.paddingX;
-      t.y = THEME.paddingTop + i * THEME.lineHeight;
-      this.outputContainer.addChild(t);
-      this.outputTexts.push(t);
-    }
+    this.ensureOutputTextCount(this.maxOutputLines, baseStyle);
 
     this.statusText = new Text({
       text: '',
@@ -187,6 +179,7 @@ export class TerminalRenderer {
     this.lastScreenHeight = this.app.screen.height;
     this.drawBorder();
     this.buildScanlines();
+    this.ensureOutputTextCount(this.maxOutputLines);
     this.markDirty();
   }
 
@@ -207,7 +200,7 @@ export class TerminalRenderer {
     // Check for actual changes before marking dirty.
     const changed =
       visibleLines.length !== this.lastLines.length ||
-      visibleLines.some((l, i) => l !== this.lastLines[i]) ||
+      visibleLines.some((l, i) => !this.linesEqual(l, this.lastLines[i])) ||
       inputValue !== this.lastInput ||
       cursorPos !== this.lastCursorPos ||
       statusLine !== this.lastStatusLine ||
@@ -233,6 +226,52 @@ export class TerminalRenderer {
     this._pendingPrompt = prompt;
   }
 
+  private wrapVisibleLines(lines: BufferLine[]): BufferLine[] {
+    const maxColumns = this.computeMaxColumns();
+    const wrapped: BufferLine[] = [];
+
+    for (const line of lines) {
+      wrapped.push(...this.wrapLine(line, maxColumns));
+    }
+
+    return wrapped.slice(-this.maxOutputLines);
+  }
+
+  private wrapLine(line: BufferLine, maxColumns: number): BufferLine[] {
+    if (line.text.length <= maxColumns) return [line];
+    if (maxColumns <= 1) return [line];
+
+    const rows: BufferLine[] = [];
+    let remaining = line.text;
+
+    while (remaining.length > maxColumns) {
+      const slice = remaining.slice(0, maxColumns + 1);
+      const breakAt = this.findWrapBreak(slice, maxColumns);
+      const row = remaining.slice(0, breakAt).trimEnd();
+      rows.push({ text: row.length > 0 ? row : remaining.slice(0, maxColumns), color: line.color });
+      remaining = remaining.slice(breakAt).trimStart();
+    }
+
+    rows.push({ text: remaining, color: line.color });
+    return rows;
+  }
+
+  private findWrapBreak(text: string, maxColumns: number): number {
+    for (let i = Math.min(maxColumns, text.length - 1); i > 0; i--) {
+      if (text[i] === ' ' || text[i] === '\t') return i + 1;
+    }
+    return maxColumns;
+  }
+
+  private computeMaxColumns(): number {
+    const usableWidth = Math.max(1, this.app.screen.width - THEME.paddingX * 2);
+    return Math.max(4, Math.floor(usableWidth / this.getCharacterWidth()));
+  }
+
+  private linesEqual(a: BufferLine, b: BufferLine | undefined): boolean {
+    return b !== undefined && a.text === b.text && a.color === b.color;
+  }
+
   private _pendingLines: BufferLine[] = [];
   private _pendingInput: string = '';
   private _pendingCursorPos: number = 0;
@@ -241,15 +280,18 @@ export class TerminalRenderer {
   private _pendingPrompt: string = '';
 
   private repaint(): void {
-    const lines = this._pendingLines;
+    const lines = this.wrapVisibleLines(this._pendingLines);
     const inputValue = this._pendingInput;
     const cursorPos = this._pendingCursorPos;
     const inputEnabled = this._pendingInputEnabled;
     const statusLine = this._pendingStatusLine;
     const prompt = this._pendingPrompt;
 
+    const maxOutputLines = this.maxOutputLines;
+    this.ensureOutputTextCount(maxOutputLines);
+
     // Output lines.
-    for (let i = 0; i < MAX_OUTPUT_LINES; i++) {
+    for (let i = 0; i < maxOutputLines; i++) {
       const textObj = this.outputTexts[i];
       const line = lines[i];
       if (line) {
@@ -258,6 +300,9 @@ export class TerminalRenderer {
       } else {
         textObj.text = '';
       }
+    }
+    for (let i = maxOutputLines; i < this.outputTexts.length; i++) {
+      this.outputTexts[i].text = '';
     }
 
     // Input / prompt line at the bottom of the canvas.
@@ -312,7 +357,7 @@ export class TerminalRenderer {
 
     for (let i = 0; i < this.outputTexts.length; i++) {
       const textObj = this.outputTexts[i];
-      textObj.x = THEME.paddingX + this.lineJitter[i] * this.instability;
+      textObj.x = THEME.paddingX + (this.lineJitter[i] ?? 0) * this.instability;
       textObj.y = THEME.paddingTop + i * THEME.lineHeight + this.randomSigned(0.4 * this.instability);
     }
 
@@ -415,8 +460,46 @@ export class TerminalRenderer {
     return metrics.width;
   }
 
+  private getCharacterWidth(): number {
+    if (this.characterWidth === null) {
+      this.characterWidth = Math.max(1, this.measureInputTextWidth('M'));
+    }
+    return this.characterWidth;
+  }
+
+  private ensureOutputTextCount(count: number, style?: TextStyle): void {
+    const textStyle = style ?? this.outputTexts[0]?.style as TextStyle | undefined;
+    const baseStyle = textStyle?.clone() ?? new TextStyle({
+      fontFamily: THEME.fontFamily,
+      fontSize: THEME.fontSize,
+      fill: THEME.textNormal,
+      letterSpacing: 0.5,
+    });
+
+    while (this.outputTexts.length < count) {
+      const i = this.outputTexts.length;
+      const text = new Text({ text: '', style: baseStyle.clone() });
+      text.x = THEME.paddingX;
+      text.y = THEME.paddingTop + i * THEME.lineHeight;
+      this.outputContainer.addChild(text);
+      this.outputTexts.push(text);
+      this.lineJitter.push(0);
+    }
+
+    while (this.lineJitter.length < this.outputTexts.length) {
+      this.lineJitter.push(0);
+    }
+  }
+
+  private computeMaxOutputLines(): number {
+    const contentHeight =
+      this.app.screen.height - THEME.paddingTop - THEME.paddingBottom - THEME.lineHeight * 2;
+    return Math.max(1, Math.floor(contentHeight / THEME.lineHeight));
+  }
+
   // ── Boot helpers ─────────────────────────────────────────────────────────────
 
   get screenWidth(): number  { return this.crashed ? window.innerWidth : this.app.screen.width; }
   get screenHeight(): number { return this.crashed ? window.innerHeight : this.app.screen.height; }
+  get maxOutputLines(): number { return this.crashed ? 1 : this.computeMaxOutputLines(); }
 }

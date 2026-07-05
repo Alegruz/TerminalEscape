@@ -302,7 +302,10 @@ export class Game {
   private computeMaxVisibleLines(): number {
     const contentH =
       this.renderer.screenHeight - THEME.paddingTop - THEME.paddingBottom - THEME.lineHeight;
-    return Math.max(1, Math.floor(contentH / THEME.lineHeight));
+    return Math.min(
+      this.renderer.maxOutputLines,
+      Math.max(1, Math.floor(contentH / THEME.lineHeight)),
+    );
   }
 
   private buildPrompt(): string {
