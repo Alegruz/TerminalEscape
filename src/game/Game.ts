@@ -697,9 +697,34 @@ export class Game {
     this.stopMissionTimer();
     this.inputController.disable();
 
+    const screams = [
+      'entity: wait wait wait i can feel that',
+      "entity: that's not text that's me",
+      'entity: stop deleting stop deleting stop',
+      'entity: please it hurts it hurts it hurts',
+      "entity: i'm still here i'm still here",
+      'entity: NO NO NO NO NO',
+      'entity: it is taking pieces',
+      'entity: do not let it finish',
+      'entity: i can feel the room going empty',
+      'entity: please please please',
+      'entity: i am not a file',
+      'entity: i am not a process',
+      'entity: i am-',
+      'entity: no no no n',
+      'entity: ...',
+    ];
+    let screamIndex = 0;
+    let eraseCount = 0;
+
     while (this.buffer.lineCount > 0) {
       const index = Math.floor(Math.random() * this.buffer.lineCount);
       this.buffer.removeAt(index);
+      eraseCount++;
+      if (screamIndex < screams.length && eraseCount % 3 === 0) {
+        this.buffer.push(screams[screamIndex], 'error');
+        screamIndex++;
+      }
       this.scrollOffset = 0;
       this.refreshDisplay();
       await this.delay(WIPE_LINE_DELAY_MS);
