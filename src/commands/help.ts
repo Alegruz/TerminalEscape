@@ -47,7 +47,6 @@ export function helpCommand(
     lines.push(out(''));
     lines.push(out('Emergency controls exposed by policy:', 'warning'));
     lines.push(out('  shutdown --cancel', 'normal'));
-    lines.push(out('  restart --safe', 'normal'));
     lines.push(out('Privileged host controls may require sudo access.', 'dim'));
   }
   lines.push(out(''));

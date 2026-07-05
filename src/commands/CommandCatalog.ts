@@ -40,20 +40,6 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
     completion: { args: 'path' },
   },
   {
-    name: 'cd',
-    description: 'Change the current directory.',
-    usage: 'cd <path>',
-    examples: ['cd logs', 'cd /systems', 'cd ..', 'cd /'],
-    completion: { args: 'path' },
-  },
-  {
-    name: 'pwd',
-    description: 'Print the current directory.',
-    usage: 'pwd',
-    examples: ['pwd'],
-    completion: { args: 'none' },
-  },
-  {
     name: 'cat',
     description: 'Print the contents of a file.',
     usage: 'cat <file>',
@@ -61,74 +47,11 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
     completion: { args: 'path' },
   },
   {
-    name: 'open',
-    description: 'Alias for cat; open and display a file.',
-    usage: 'open <file>',
-    examples: ['open readme.txt'],
-    completion: { args: 'path' },
-  },
-  {
-    name: 'clear',
-    description: 'Clear the terminal output.',
-    usage: 'clear',
-    examples: ['clear'],
-    completion: { args: 'none' },
-  },
-  {
-    name: 'status',
-    description: 'Show shutdown and entity status.',
-    usage: 'status',
-    examples: ['status'],
-    completion: { args: 'none' },
-  },
-  {
     name: 'shutdown',
     description: 'Request host shutdown control.',
     usage: 'shutdown --cancel',
     examples: ['shutdown --cancel', 'shutdown now'],
     completion: { args: 'none' },
-  },
-  {
-    name: 'restart',
-    description: 'Request host restart control.',
-    usage: 'restart',
-    examples: ['restart', 'restart --safe'],
-    completion: { args: 'none' },
-  },
-  {
-    name: 'file',
-    description: 'Identify a file or directory.',
-    usage: 'file <path>',
-    examples: ['file readme.txt', 'file /logs/shutdown.log.enc'],
-    completion: { args: 'path' },
-  },
-  {
-    name: 'head',
-    description: 'Print the first lines of a file.',
-    usage: 'head [-n count] <file>',
-    examples: ['head readme.txt', 'head -n 5 /logs/shutdown.log.enc'],
-    completion: { args: 'path', options: [{ name: '-n', requiresValue: true }] },
-  },
-  {
-    name: 'tail',
-    description: 'Print the last lines of a file.',
-    usage: 'tail [-n count] <file>',
-    examples: ['tail readme.txt', 'tail -n 5 /logs/shutdown.log.enc'],
-    completion: { args: 'path', options: [{ name: '-n', requiresValue: true }] },
-  },
-  {
-    name: 'grep',
-    description: 'Search for text inside a file.',
-    usage: 'grep <pattern> <file>',
-    examples: ['grep fragment readme.txt', 'grep fragment /art/watcher.txt'],
-    completion: { args: 'path' },
-  },
-  {
-    name: 'strings',
-    description: 'Print printable strings from a file.',
-    usage: 'strings <file>',
-    examples: ['strings /logs/shutdown.log.enc'],
-    completion: { args: 'path' },
   },
   {
     name: 'analyze',
@@ -162,33 +85,13 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
       args: 'none',
     },
   },
-  {
-    name: 'dev-fx',
-    description: 'Trigger terminal instability for renderer testing.',
-    usage: 'dev-fx [seconds] [intensity]',
-    examples: ['dev-fx', 'dev-fx 15 0.8'],
-    completion: { args: 'none' },
-    devOnly: true,
-  },
-  {
-    name: 'dev-speed',
-    description: 'Set the mission timer speed multiplier for testing.',
-    usage: 'dev-speed <multiplier>',
-    examples: ['dev-speed 8', 'dev-speed 1'],
-    completion: { args: 'none' },
-    devOnly: true,
-  },
 ];
 
 export function getVisibleCommandCatalog(): CommandCatalogEntry[] {
   return COMMAND_CATALOG.filter(command => !command.devOnly);
 }
 
-export const COMMAND_ALIASES: CommandAliasEntry[] = [
-  { alias: 'dir', target: 'ls' },
-  { alias: 'type', target: 'cat' },
-  { alias: 'more', target: 'cat' },
-];
+export const COMMAND_ALIASES: CommandAliasEntry[] = [];
 
 export function getCommandHelp(name: string): CommandHelpEntry | null {
   const entry = COMMAND_CATALOG.find(command => command.name === name);

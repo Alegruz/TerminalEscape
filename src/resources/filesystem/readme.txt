@@ -15,7 +15,6 @@ Internal notes say the sudo password was split into two fragments:
 Useful commands:
   help
   tiles
-  status
   shutdown --cancel
   ls /logs
   analyze /logs/shutdown.log.enc

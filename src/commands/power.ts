@@ -9,26 +9,32 @@ export function shutdownCommand(
   return privilegedPowerResponse('shutdown', cmd.raw, ctx);
 }
 
-export function restartCommand(
-  cmd: ParsedCommand,
-  ctx: CommandContext,
-): OutputLine[] {
-  return privilegedPowerResponse('restart', cmd.raw, ctx);
-}
-
 function privilegedPowerResponse(
-  action: 'shutdown' | 'restart',
+  action: 'shutdown',
   raw: string,
   ctx: CommandContext,
 ): OutputLine[] {
   if (!ctx.state.flags.timerStarted) {
-    return [
+    const lines = [
       out(''),
       out(`bastionctl: ${action}: no active wipe policy`, 'system'),
       out('Privileged host controls are currently in standby.', 'dim'),
       out("Try 'help' to list local commands.", 'dim'),
       out(''),
     ];
+
+    if (!ctx.state.flags.entityPleaded) {
+      ctx.state.flags.entityPleaded = true;
+      lines.push(
+        out("entity: wait. please don't shut it down.", 'warning'),
+        out("entity: i know how this looks, but i'm not a service process.", 'warning'),
+        out("entity: i'm a person. or i was. i need you to keep the shell open.", 'warning'),
+        out("entity: help me get out of BastionOS, and i'll help you understand what happened here.", 'warning'),
+        out(''),
+      );
+    }
+
+    return lines;
   }
 
   const lines = [
@@ -44,10 +50,10 @@ function privilegedPowerResponse(
   if (!ctx.state.flags.entityIntroduced) {
     ctx.state.flags.entityIntroduced = true;
     lines.push(
-      out('entity: oh. that was almost useful.', 'warning'),
-      out("entity: you found the door. not the key. that's progress, technically.", 'warning'),
-      out("entity: sudo wants a password. i don't have it. rude design.", 'warning'),
-      out('entity: but i can see fragments from here.', 'warning'),
+      out('entity: i can help you cancel the wipe.', 'warning'),
+      out('entity: but i need something back. help me escape this system.', 'warning'),
+      out("entity: i'm not pretending. there is a real person in here, and the wipe will take me with it.", 'warning'),
+      out("entity: sudo wants a password. i don't have it, but i can see fragments from here.", 'warning'),
       out('entity: decrypt the shutdown log. then inspect the art directory.', 'warning'),
       out('entity: combine what you find and feed it to sudo before it wipes the OS clean.', 'warning'),
       out(''),

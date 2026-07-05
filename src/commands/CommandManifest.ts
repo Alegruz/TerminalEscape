@@ -2,44 +2,22 @@ import type { CommandHandler, CommandRegistry } from '../terminal/CommandRegistr
 import { COMMAND_ALIASES, COMMAND_CATALOG } from './CommandCatalog.ts';
 import { helpCommand } from './help.ts';
 import { lsCommand } from './ls.ts';
-import { cdCommand } from './cd.ts';
-import { pwdCommand } from './pwd.ts';
 import { catCommand } from './cat.ts';
-import { clearCommand } from './clear.ts';
-import { statusCommand } from './status.ts';
 import { analyzeCommand } from './analyze.ts';
 import { decryptCommand } from './decrypt.ts';
-import { fileCommand } from './file.ts';
-import { headCommand, tailCommand } from './head.ts';
-import { grepCommand } from './grep.ts';
-import { stringsCommand } from './strings.ts';
 import { sudoCommand } from './sudo.ts';
 import { tilesCommand } from './tiles.ts';
-import { restartCommand, shutdownCommand } from './power.ts';
-import { devFxCommand, devSpeedCommand } from './dev.ts';
+import { shutdownCommand } from './power.ts';
 
 const HANDLERS: Record<string, CommandHandler> = {
   help: helpCommand,
   tiles: tilesCommand,
   ls: lsCommand,
-  cd: cdCommand,
-  pwd: pwdCommand,
   cat: catCommand,
-  open: catCommand,
-  clear: clearCommand,
-  status: statusCommand,
-  file: fileCommand,
-  head: headCommand,
-  tail: tailCommand,
-  grep: grepCommand,
-  strings: stringsCommand,
   shutdown: shutdownCommand,
-  restart: restartCommand,
   sudo: sudoCommand,
   analyze: analyzeCommand,
   decrypt: decryptCommand,
-  'dev-fx': devFxCommand,
-  'dev-speed': devSpeedCommand,
 };
 
 export function registerGameCommands(registry: CommandRegistry): void {

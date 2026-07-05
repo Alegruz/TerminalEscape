@@ -28,6 +28,7 @@ export class GameState {
     tilesStarted: false,
     timerStarted: false,
     tilesCrashed: false,
+    entityPleaded: false,
     entityIntroduced: false,
     logDecrypted: false,
     shutdownStopped: false,

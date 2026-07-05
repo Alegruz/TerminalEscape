@@ -22,7 +22,8 @@ Core commands include:
 
 ```sh
 help
-status
+tiles
+shutdown --cancel
 ls /logs
 analyze /logs/shutdown.log.enc
 decrypt --method caesar --key <number> /logs/shutdown.log.enc
