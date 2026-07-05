@@ -1,4 +1,5 @@
 import type { CommandCompletionSpec } from '../terminal/CommandRegistry.ts';
+import type { GameState } from '../game/GameState.ts';
 
 export interface CommandHelpEntry {
   description: string;
@@ -79,23 +80,29 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
   {
     name: 'sudo',
     description: 'Run the only privileged action the shutdown daemon accepts.',
-    usage: 'sudo shutdown --cancel <password>',
-    examples: ['sudo shutdown --cancel <password>'],
+    usage: 'sudo shutdown (--cancel|--wipe)',
+    examples: ['sudo shutdown --cancel', 'sudo shutdown --wipe'],
     completion: {
       args: 'none',
     },
   },
 ];
 
-export function getVisibleCommandCatalog(): CommandCatalogEntry[] {
-  return COMMAND_CATALOG.filter(command => !command.devOnly);
+function isSuppressed(commandName: string, state?: GameState): boolean {
+  return commandName === 'shutdown' &&
+    Boolean(state?.flags.shutdownCommandSuppressed) &&
+    !Boolean(state?.flags.timerStarted);
+}
+
+export function getVisibleCommandCatalog(state?: GameState): CommandCatalogEntry[] {
+  return COMMAND_CATALOG.filter(command => !command.devOnly && !isSuppressed(command.name, state));
 }
 
 export const COMMAND_ALIASES: CommandAliasEntry[] = [];
 
-export function getCommandHelp(name: string): CommandHelpEntry | null {
+export function getCommandHelp(name: string, state?: GameState): CommandHelpEntry | null {
   const entry = COMMAND_CATALOG.find(command => command.name === name);
-  if (!entry || entry.devOnly) return null;
+  if (!entry || entry.devOnly || isSuppressed(entry.name, state)) return null;
   return {
     description: entry.description,
     usage: entry.usage,

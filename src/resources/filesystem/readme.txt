@@ -3,7 +3,7 @@ BastionOS Recovery Console
 
 Wipe status     : IDLE
 Resident status : NOT INDEXED
-Root action     : sudo shutdown --cancel <password>
+Root action     : sudo shutdown --cancel
 
 This recovery console exposes local diagnostics, files, and one bundled game.
 If clean system wipe begins, only sudo can cancel it.

@@ -22,6 +22,7 @@ export class GameState {
   submittedCommandCount = 0;
   invalidCommandCount = 0;
   tilesMoveCount = 0;
+  preErrorShutdownCount = 0;
 
   flags = {
     helpSeen: false,
@@ -29,6 +30,7 @@ export class GameState {
     timerStarted: false,
     tilesCrashed: false,
     entityPleaded: false,
+    shutdownCommandSuppressed: false,
     entityIntroduced: false,
     logDecrypted: false,
     shutdownStopped: false,

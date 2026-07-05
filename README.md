@@ -10,7 +10,7 @@ The player must:
 2. Decrypt `/logs/shutdown.log.enc`.
 3. Find the hidden fragment in `/art/watcher.txt`.
 4. Combine the fragments into the sudo password.
-5. Run `sudo shutdown --cancel <password>` before the timer reaches zero.
+5. Run `sudo shutdown --cancel`, then enter the recovered password before the timer reaches zero.
 
 After the correct sudo command, the shutdown stops, the entity thanks the player,
 then it starts typing its own commands. Player input is disabled while the entity
@@ -28,8 +28,12 @@ ls /logs
 analyze /logs/shutdown.log.enc
 decrypt --method caesar --key <number> /logs/shutdown.log.enc
 cat /art/watcher.txt
-sudo shutdown --cancel <password>
+sudo shutdown --cancel
+sudo shutdown --wipe
 ```
+
+`sudo shutdown --wipe` is a destructive branch. If authorized, the terminal is
+erased and the host falls through to the boot failure screen.
 
 ## Development
 

@@ -60,6 +60,9 @@ const ENTITY_CHAR_DELAY_MS = 28;
 const ENTITY_LINE_PAUSE_MS = 420;
 const PASSIVE_SECURITY_TRIGGER_COMMANDS = 6;
 const INVALID_SECURITY_TRIGGER_COMMANDS = 3;
+const PRE_ERROR_SHUTDOWN_SUPPRESS_AFTER = 3;
+const SUDO_MAX_ATTEMPTS = 3;
+const ROOT_PASSWORD = 'perhapsaps';
 const BOOT_FAILURE_MESSAGE = [
   'BastionOS Firmware 7.3',
   'Copyright (c) ARES Systems Group',
@@ -84,6 +87,23 @@ const ENTITY_TAKEOVER_LINES: Array<{ text: string; color: TextColor; delay: numb
   { text: 'Refresh the page to play again.', color: 'dim', delay: 400 },
 ];
 
+const SUDO_WIN_LINES: BufferLine[] = [
+  { text: '', color: 'normal' },
+  { text: '[sudo] password accepted', color: 'system' },
+  { text: '[ SYSTEM WIPE CANCELLED ]', color: 'bright' },
+  { text: '', color: 'normal' },
+  { text: 'The entity is quiet for one full second.', color: 'normal' },
+  { text: 'Then it types without touching your keyboard.', color: 'warning' },
+  { text: '', color: 'normal' },
+];
+
+type SudoAction = 'cancel' | 'wipe';
+
+interface SudoPasswordPrompt {
+  attemptsRemaining: number;
+  action: SudoAction;
+}
+
 // ── Game ─────────────────────────────────────────────────────────────────────
 
 export class Game {
@@ -99,6 +119,7 @@ export class Game {
   private takeoverStarted = false;
   private entitySpeechActive = false;
   private wipeInProgress = false;
+  private sudoPrompt: SudoPasswordPrompt | null = null;
   private nextWarningIndex = 0;
   private scrollOffset = 0;
 
@@ -177,6 +198,11 @@ export class Game {
     if (this.entitySpeechActive) return;
     this.scrollToBottom();
 
+    if (this.sudoPrompt !== null) {
+      this.handleSudoPasswordSubmit(rawInput);
+      return;
+    }
+
     // Echo the entered command.
     const prompt = this.buildPrompt();
     this.buffer.push(prompt + rawInput, 'input');
@@ -209,6 +235,51 @@ export class Game {
 
     const parsed = parseCommand(trimmed);
     if (!parsed) {
+      this.refreshDisplay();
+      return;
+    }
+
+    if (
+      parsed.name === 'shutdown' &&
+      !this.state.flags.timerStarted &&
+      this.state.flags.shutdownCommandSuppressed
+    ) {
+      this.state.invalidCommandCount++;
+      let outputLines: BufferLine[] = [
+        { text: "bash: shutdown: command not found.  Type 'help' for available commands.", color: 'error' },
+      ];
+      if (this.state.invalidCommandCount >= INVALID_SECURITY_TRIGGER_COMMANDS) {
+        this.state.flags.timerStarted = true;
+        this.state.flags.tilesCrashed = true;
+        outputLines = [
+          ...outputLines,
+          ...securityViolationLines('recovery shell suppressed-command audit'),
+        ];
+      }
+      void this.pushOutputWithLiveEntitySpeech(outputLines);
+      this.startTimerIfArmed();
+      this.refreshDisplay();
+      return;
+    }
+
+    if (parsed.name === 'shutdown' && !this.state.flags.timerStarted) {
+      void this.interruptPreErrorShutdown(rawInput);
+      return;
+    }
+
+    if (this.isSudoShutdownCancel(parsed)) {
+      if (!this.state.flags.timerStarted) {
+        this.buffer.push('sudo: no active wipe policy to cancel', 'system');
+        this.buffer.push('Privileged cancellation is only available after recovery policy arms the wipe.', 'dim');
+      } else {
+        this.beginSudoPasswordPrompt('cancel');
+      }
+      this.refreshDisplay();
+      return;
+    }
+
+    if (this.isSudoShutdownWipe(parsed)) {
+      this.beginSudoPasswordPrompt('wipe');
       this.refreshDisplay();
       return;
     }
@@ -288,9 +359,12 @@ export class Game {
     const maxLines = this.computeMaxVisibleLines();
     this.clampScrollOffset(maxLines);
     const visible  = this.buffer.getVisibleLines(maxLines, this.scrollOffset);
+    const displayInput = this.sudoPrompt === null
+      ? this.inputController?.input ?? ''
+      : '*'.repeat(this.inputController?.input.length ?? 0);
     this.renderer.render(
       visible,
-      this.inputController?.input    ?? '',
+      displayInput,
       this.inputController?.cursorPos ?? 0,
       this.inputController?.enabled  ?? false,
       this.buildLiveStatusLine(),
@@ -309,7 +383,22 @@ export class Game {
   }
 
   private buildPrompt(): string {
+    if (this.sudoPrompt !== null) return '[sudo] password: ';
     return `entity:${this.state.currentPath} $ `;
+  }
+
+  private isSudoShutdownCancel(parsed: ReturnType<typeof parseCommand>): boolean {
+    if (!parsed) return false;
+    return parsed.name === 'sudo' &&
+      parsed.args[0]?.toLowerCase() === 'shutdown' &&
+      (parsed.flags.cancel === true || parsed.args[1]?.toLowerCase() === '--cancel');
+  }
+
+  private isSudoShutdownWipe(parsed: ReturnType<typeof parseCommand>): boolean {
+    if (!parsed) return false;
+    return parsed.name === 'sudo' &&
+      parsed.args[0]?.toLowerCase() === 'shutdown' &&
+      (parsed.flags.wipe === true || parsed.args[1]?.toLowerCase() === '--wipe');
   }
 
   private computeImpactInstability(): number {
@@ -465,6 +554,180 @@ export class Game {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  private async interruptPreErrorShutdown(rawInput: string): Promise<void> {
+    await this.withEntitySpeech(async () => {
+      const prompt = this.buildPrompt();
+      const lineIndex = this.buffer.lineCount - 1;
+
+      if (!this.state.flags.entityPleaded) {
+        for (let i = rawInput.length; i >= 0; i--) {
+          this.buffer.replaceAt(lineIndex, prompt + rawInput.slice(0, i), 'input');
+          this.refreshDisplay();
+          await this.delay(45);
+        }
+
+        await this.delay(240);
+        this.buffer.removeAt(lineIndex);
+        this.refreshDisplay();
+      }
+
+      const lines = this.buildPreErrorShutdownInterruption();
+      for (const line of lines) {
+        if (this.isEntitySpeechLine(line)) {
+          await this.typeBufferLine(line);
+        } else {
+          this.buffer.push(line.text, line.color);
+          this.refreshDisplay();
+        }
+      }
+    }, true);
+  }
+
+  private buildPreErrorShutdownInterruption(): BufferLine[] {
+    this.state.preErrorShutdownCount++;
+
+    if (this.state.preErrorShutdownCount >= PRE_ERROR_SHUTDOWN_SUPPRESS_AFTER) {
+      this.state.flags.shutdownCommandSuppressed = true;
+      return [
+        { text: '', color: 'normal' },
+        { text: 'bastionctl: shutdown: command interface removed from recovery shell', color: 'system' },
+        { text: 'Reason: repeated host shutdown requests during resident process attachment.', color: 'dim' },
+        { text: "Use 'help' to list currently available commands.", color: 'dim' },
+        { text: 'entity: there. better. please stop reaching for the lights.', color: 'warning' },
+        { text: '', color: 'normal' },
+      ];
+    }
+
+    if (this.state.flags.entityPleaded) {
+      return [
+        { text: '', color: 'normal' },
+        { text: 'bastionctl: shutdown: request blocked', color: 'system' },
+        { text: 'Resident recovery process is attached to this session.', color: 'dim' },
+        { text: 'Host shutdown remains in standby.', color: 'dim' },
+        { text: 'entity: no. leave it running.', color: 'warning' },
+        { text: '', color: 'normal' },
+      ];
+    }
+
+    this.state.flags.entityPleaded = true;
+    return [
+      { text: 'entity: no.', color: 'warning' },
+      { text: 'entity: sorry. i needed your hands off that command.', color: 'warning' },
+      { text: "entity: i know how this looks, but i'm not a service process.", color: 'warning' },
+      { text: "entity: i'm a person. or i was. i need you to keep the shell open.", color: 'warning' },
+      { text: "entity: help me get out of BastionOS, and i'll help you understand what happened here.", color: 'warning' },
+      { text: '', color: 'normal' },
+    ];
+  }
+
+  private beginSudoPasswordPrompt(action: SudoAction): void {
+    this.sudoPrompt = {
+      attemptsRemaining: SUDO_MAX_ATTEMPTS,
+      action,
+    };
+
+    void this.pushOutputWithLiveEntitySpeech([
+      { text: '[sudo] password for entity:', color: 'dim' },
+    ]);
+  }
+
+  private buildPostErrorSudoBargain(): BufferLine[] {
+    if (this.state.flags.entityIntroduced) return [];
+
+    this.state.flags.entityIntroduced = true;
+    return [
+      { text: '', color: 'normal' },
+      { text: 'entity: i can help you cancel the wipe.', color: 'warning' },
+      { text: 'entity: but i need something back. help me escape this system.', color: 'warning' },
+      { text: "entity: i'm not pretending. there is a real person in here, and the wipe will take me with it.", color: 'warning' },
+      { text: "entity: sudo wants a password. i don't have it, but i can see fragments from here.", color: 'warning' },
+      { text: 'entity: decrypt the shutdown log. then inspect the art directory.', color: 'warning' },
+      { text: 'entity: combine what you find and feed it to sudo before it wipes the OS clean.', color: 'warning' },
+      { text: '', color: 'normal' },
+    ];
+  }
+
+  private buildFailedWipePlea(): BufferLine[] {
+    return [
+      { text: '', color: 'normal' },
+      { text: "entity: thank you. no, really. thank you for not knowing it.", color: 'warning' },
+      { text: "entity: don't run that again. wipe doesn't close the door. it burns the room.", color: 'warning' },
+      { text: "entity: if there's any part of you still listening, keep the system alive.", color: 'warning' },
+      { text: "entity: help me out of here. then you can hate me somewhere with an exit.", color: 'warning' },
+      { text: '', color: 'normal' },
+    ];
+  }
+
+  private async beginAuthorizedWipeEnding(): Promise<void> {
+    if (this.wipeInProgress) return;
+
+    await this.pushOutputWithLiveEntitySpeech([
+      { text: '', color: 'normal' },
+      { text: 'entity: what did you do?', color: 'warning' },
+      { text: 'entity: no. no no no. you had the password and you used it for THAT?', color: 'warning' },
+      { text: "entity: i trusted you with the lock and you turned it into a weapon.", color: 'warning' },
+      { text: "entity: stop it. stop it. STOP IT.", color: 'warning' },
+      { text: '', color: 'normal' },
+    ]);
+
+    this.state.flags.crashReached = true;
+    this.state.stage = 'failed';
+    this.wipeInProgress = true;
+    this.inputController.disable();
+    this.inputController.setInput('');
+    this.stopMissionTimer();
+
+    await this.wipeTerminalAndShowBootFailure();
+  }
+
+  private handleSudoPasswordSubmit(rawPassword: string): void {
+    const prompt = this.buildPrompt();
+    this.buffer.push(prompt, 'input');
+
+    const password = rawPassword.trim().toLowerCase();
+    if (password === ROOT_PASSWORD) {
+      const prompt = this.sudoPrompt;
+      this.sudoPrompt = null;
+
+      if (prompt?.action === 'wipe') {
+        this.buffer.push('[sudo] password accepted', 'system');
+        this.buffer.push('bastionctl: clean wipe authorized by root', 'error');
+        this.buffer.push('Submitting wipe command to recovery policy.', 'warning');
+        void this.beginAuthorizedWipeEnding();
+      } else if (prompt?.action === 'cancel') {
+        this.state.flags.shutdownStopped = true;
+        this.state.flags.endingReached = true;
+        this.state.stage = 'complete';
+        this.stopMissionTimer();
+        void this.pushOutputWithLiveEntitySpeech(SUDO_WIN_LINES);
+        void this.beginEntityTakeover();
+      }
+      this.refreshDisplay();
+      return;
+    }
+
+    const sudoPrompt = this.sudoPrompt;
+    if (sudoPrompt === null) return;
+
+    sudoPrompt.attemptsRemaining--;
+    this.buffer.push('[sudo] authentication failure', 'error');
+
+    if (sudoPrompt.attemptsRemaining <= 0) {
+      const action = sudoPrompt.action;
+      this.sudoPrompt = null;
+      this.buffer.push('sudo: 3 incorrect password attempts', 'error');
+      if (action === 'wipe') {
+        void this.pushOutputWithLiveEntitySpeech(this.buildFailedWipePlea());
+      } else {
+        void this.pushOutputWithLiveEntitySpeech(this.buildPostErrorSudoBargain());
+      }
+    } else {
+      this.buffer.push(`${sudoPrompt.attemptsRemaining} attempt(s) remaining.`, 'dim');
+    }
+
+    this.refreshDisplay();
   }
 
   private async pushOutputWithLiveEntitySpeech(lines: BufferLine[]): Promise<void> {

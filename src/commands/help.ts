@@ -9,7 +9,7 @@ export function helpCommand(
 ): OutputLine[] {
   if (cmd.args.length > 0) {
     const target = cmd.args[0].toLowerCase();
-    const info = getCommandHelp(target);
+    const info = getCommandHelp(target, ctx.state);
     if (!info) {
       return [out(`No help entry for '${target}'.`, 'error')];
     }
@@ -30,7 +30,7 @@ export function helpCommand(
     out('Available commands:', 'bright'),
     out(''),
   ];
-  for (const info of getVisibleCommandCatalog()) {
+  for (const info of getVisibleCommandCatalog(ctx.state)) {
     lines.push(out(`  ${info.name.padEnd(10)} ${info.description}`, 'normal'));
   }
   lines.push(out(''));
@@ -47,7 +47,7 @@ export function helpCommand(
     lines.push(out(''));
     lines.push(out('Emergency controls exposed by policy:', 'warning'));
     lines.push(out('  shutdown --cancel', 'normal'));
-    lines.push(out('Privileged host controls may require sudo access.', 'dim'));
+    lines.push(out('Wipe cancellation requires sudo access.', 'dim'));
   }
   lines.push(out(''));
   return lines;

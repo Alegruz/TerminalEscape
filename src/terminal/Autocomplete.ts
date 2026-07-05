@@ -77,11 +77,15 @@ export class Autocomplete {
     const current = tokens[tokens.length - 1] ?? { value: '', start: 0, end: 0 };
 
     if (tokens.length <= 1) {
-      return this.completeCommand(input, current, registry);
+      return this.completeCommand(input, current, registry, state);
     }
 
     const commandName = registry.resolveName(tokens[0].value.toLowerCase());
-    if (!registry.hasCommand(commandName)) return null;
+    if (!registry.hasCommand(commandName) || this.isCommandSuppressed(commandName, state)) return null;
+
+    if (commandName === 'sudo') {
+      return this.completeSudoShutdown(input, current, tokens);
+    }
 
     const spec = registry.getCompletionSpec(commandName);
     const optionValue = this.findOptionAwaitingValue(tokens, current, spec);
@@ -94,7 +98,7 @@ export class Autocomplete {
     }
 
     if (spec.args === 'command') {
-      return this.completeCommand(input, current, registry);
+      return this.completeCommand(input, current, registry, state);
     }
 
     if (spec.args === 'path') {
@@ -108,12 +112,41 @@ export class Autocomplete {
     input: string,
     token: InputToken,
     registry: CommandRegistry,
+    state: GameState,
   ): CompletionResult {
     const prefix = token.value.toLowerCase();
-    const names = registry.getCommandNames().filter(n => n.startsWith(prefix));
+    const names = registry.getCommandNames()
+      .filter(name => !this.isCommandSuppressed(name, state))
+      .filter(n => n.startsWith(prefix));
     const result = this.completeFromCandidates(prefix, names, true);
     if (!result || 'candidates' in result) return result;
     return { completed: replaceToken(input, token, result.completed) };
+  }
+
+  private completeSudoShutdown(
+    input: string,
+    token: InputToken,
+    tokens: InputToken[],
+  ): CompletionResult {
+    if (tokens.length === 2) {
+      const result = this.completeFromCandidates(token.value.toLowerCase(), ['shutdown'], true);
+      if (!result || 'candidates' in result) return result;
+      return { completed: replaceToken(input, token, result.completed) };
+    }
+
+    if (tokens.length === 3 && tokens[1].value.toLowerCase() === 'shutdown') {
+      const result = this.completeFromCandidates(token.value.toLowerCase(), ['--cancel', '--wipe'], true);
+      if (!result || 'candidates' in result) return result;
+      return { completed: replaceToken(input, token, result.completed) };
+    }
+
+    return null;
+  }
+
+  private isCommandSuppressed(commandName: string, state: GameState): boolean {
+    return commandName === 'shutdown' &&
+      state.flags.shutdownCommandSuppressed &&
+      !state.flags.timerStarted;
   }
 
   private completeOption(
