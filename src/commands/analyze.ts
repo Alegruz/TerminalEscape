@@ -2,13 +2,17 @@ import type { ParsedCommand } from '../terminal/CommandParser.ts';
 import type { CommandContext, OutputLine } from '../terminal/CommandRegistry.ts';
 import { out } from '../terminal/CommandRegistry.ts';
 import { checkFileAccess } from '../fs/AccessControl.ts';
+import { caesarDecrypt } from '../puzzles/crypto.ts';
 
-/** Heuristic: is the text predominantly uppercase letters (Caesar-like)? */
-function looksLikeCaesar(text: string): boolean {
+/** Heuristic: does the text look like alphabetic text with preserved spacing? */
+function looksLikeRotationalText(text: string): boolean {
   const letters = text.replace(/[^a-zA-Z]/g, '');
-  if (letters.length < 10) return false;
-  const uppers = letters.replace(/[^A-Z]/g, '').length;
-  return uppers / letters.length > 0.75;
+  if (letters.length < 40) return false;
+
+  const printable = text.replace(/[^\x20-\x7e\r\n\t]/g, '');
+  const printableRatio = printable.length / Math.max(1, text.length);
+  const wordLikeTokens = text.split(/\s+/g).filter(token => /[A-Za-z]{2,}/.test(token));
+  return printableRatio > 0.9 && wordLikeTokens.length >= 8;
 }
 
 /** Rough frequency analysis hint. */
@@ -22,6 +26,43 @@ function mostFrequentLetters(text: string): string {
     .slice(0, 5)
     .map(([ch]) => ch)
     .join(', ');
+}
+
+function scorePlaintextCandidate(text: string): number {
+  const upper = text.toUpperCase();
+  const words = ['THE', 'LOG', 'ENTITY', 'RECOVERY', 'SHUTDOWN', 'SYSTEM', 'DISPLAY', 'SHELL'];
+  return words.reduce((score, word) => score + (upper.includes(word) ? 1 : 0), 0);
+}
+
+function previewLine(text: string): string {
+  const firstUsefulLine = text
+    .split(/\r?\n/g)
+    .map(line => line.trim())
+    .find(line => /[A-Za-z]/.test(line)) ?? text.trim();
+  return firstUsefulLine.length > 34
+    ? firstUsefulLine.slice(0, 31) + '...'
+    : firstUsefulLine;
+}
+
+function rotationScan(text: string): Array<{ key: number; preview: string }> {
+  return Array.from({ length: 25 }, (_, i) => i + 1)
+    .map(key => {
+      const decrypted = caesarDecrypt(text, key);
+      return {
+        key,
+        preview: previewLine(decrypted),
+        score: scorePlaintextCandidate(decrypted),
+      };
+    })
+    .sort((a, b) => b.score - a.score || a.key - b.key)
+    .slice(0, 4)
+    .map(({ key, preview }) => ({ key, preview }));
+}
+
+function bestRotationScore(text: string): number {
+  return Math.max(
+    ...Array.from({ length: 25 }, (_, i) => scorePlaintextCandidate(caesarDecrypt(text, i + 1))),
+  );
 }
 
 export function analyzeCommand(
@@ -70,16 +111,19 @@ export function analyzeCommand(
     return lines;
   }
 
-  if (looksLikeCaesar(content)) {
-    lines.push(out('  Type      : text — possible substitution cipher', 'warning'));
+  if (looksLikeRotationalText(content) && bestRotationScore(content) > 0) {
+    const scan = rotationScan(content);
+    lines.push(out('  Type      : text - rotational substitution', 'warning'));
     lines.push(out('  Top chars : ' + mostFrequentLetters(content), 'dim'));
-    lines.push(out('  Pattern   : all-caps, single-char substitution', 'dim'));
+    lines.push(out('  Pattern   : alphabet wheel; spacing survived', 'dim'));
     lines.push(out(''));
-    lines.push(out('  Recommendation:', 'bright'));
-    lines.push(out('    Likely Caesar-family substitution.', 'normal'));
-    lines.push(
-      out(`    decrypt --method caesar --key <number> ${cmd.args[0]}`, 'system'),
-    );
+    lines.push(out('  Rotation scan:', 'bright'));
+    for (const candidate of scan) {
+      lines.push(out(`    ${String(candidate.key).padStart(2, '0')} -> ${candidate.preview}`, 'normal'));
+    }
+    lines.push(out(''));
+    lines.push(out('  Tool accepts:', 'bright'));
+    lines.push(out(`    decrypt --method caesar --key <rotation> ${cmd.args[0]}`, 'system'));
   } else {
     lines.push(out('  Type      : plain text or unknown encoding', 'normal'));
     lines.push(out('  No strong cipher signature detected.', 'dim'));

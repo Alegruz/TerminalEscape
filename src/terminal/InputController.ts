@@ -50,6 +50,20 @@ export class InputController {
     this.onChange();
   }
 
+  private previousWordBoundary(): number {
+    let pos = this._cursorPos;
+    while (pos > 0 && /\s/.test(this._input[pos - 1])) pos--;
+    while (pos > 0 && !/\s/.test(this._input[pos - 1])) pos--;
+    return pos;
+  }
+
+  private nextWordBoundary(): number {
+    let pos = this._cursorPos;
+    while (pos < this._input.length && /\s/.test(this._input[pos])) pos++;
+    while (pos < this._input.length && !/\s/.test(this._input[pos])) pos++;
+    return pos;
+  }
+
   // ── Key handling ─────────────────────────────────────────────────────────────
 
   private handleKeyDown(e: KeyboardEvent): void {
@@ -70,7 +84,14 @@ export class InputController {
 
       case 'Backspace': {
         e.preventDefault();
-        if (this._cursorPos > 0) {
+        if (e.ctrlKey) {
+          const start = this.previousWordBoundary();
+          if (start < this._cursorPos) {
+            this._input = this._input.slice(0, start) + this._input.slice(this._cursorPos);
+            this._cursorPos = start;
+            this.onChange();
+          }
+        } else if (this._cursorPos > 0) {
           this._input =
             this._input.slice(0, this._cursorPos - 1) +
             this._input.slice(this._cursorPos);
@@ -82,7 +103,13 @@ export class InputController {
 
       case 'Delete': {
         e.preventDefault();
-        if (this._cursorPos < this._input.length) {
+        if (e.ctrlKey) {
+          const end = this.nextWordBoundary();
+          if (end > this._cursorPos) {
+            this._input = this._input.slice(0, this._cursorPos) + this._input.slice(end);
+            this.onChange();
+          }
+        } else if (this._cursorPos < this._input.length) {
           this._input =
             this._input.slice(0, this._cursorPos) +
             this._input.slice(this._cursorPos + 1);
@@ -93,8 +120,9 @@ export class InputController {
 
       case 'ArrowLeft': {
         e.preventDefault();
-        if (this._cursorPos > 0) {
-          this._cursorPos--;
+        const nextPos = e.ctrlKey ? this.previousWordBoundary() : this._cursorPos - 1;
+        if (nextPos >= 0 && nextPos !== this._cursorPos) {
+          this._cursorPos = nextPos;
           this.onChange();
         }
         break;
@@ -102,8 +130,9 @@ export class InputController {
 
       case 'ArrowRight': {
         e.preventDefault();
-        if (this._cursorPos < this._input.length) {
-          this._cursorPos++;
+        const nextPos = e.ctrlKey ? this.nextWordBoundary() : this._cursorPos + 1;
+        if (nextPos <= this._input.length && nextPos !== this._cursorPos) {
+          this._cursorPos = nextPos;
           this.onChange();
         }
         break;

@@ -1,25 +1,37 @@
 BastionOS Recovery Console
 ==========================
 
-Wipe status     : IDLE
-Resident status : NOT INDEXED
-Root action     : sudo shutdown --cancel
+recovery image : mounted
+operator shell : limited
+resident proc  : present, unindexed
+wipe daemon    : armed only after a bad shutdown request
 
-This recovery console exposes local diagnostics, files, and one bundled game.
-If clean system wipe begins, only sudo can cancel it.
+Recent console capture:
 
-Internal notes say privileged recovery depends on two local traces:
-  - one trace is inside an encrypted shutdown log
-  - one trace is referenced by a riddle in that log
-
-Useful commands:
-  help
-  tiles
+  entity:/ $ help
+  ...
   shutdown --cancel
-  ls /logs
-  analyze /logs/shutdown.log.enc
-  decrypt --method caesar --key <number> /logs/shutdown.log.enc
+  ls
+  cat
+  analyze
+  decrypt
   screensaver
 
-Combine the traces in the order you find them, then pass the result to sudo
-if the host asks for privileged recovery.
+  entity:/ $ shutdown --cancel
+  shutdown: normal user request refused by wipe daemon
+  To cancel the wipe, use: sudo shutdown --cancel
+
+  entity:/ $ ls /logs
+  shutdown.log.enc
+
+  entity:/ $ analyze /logs/shutdown.log.enc
+  Type      : text - rotational substitution
+  Pattern   : alphabet wheel; spacing survived
+
+Local note:
+
+The resident process reacts to evidence, not explanations.
+Give it files to read. Let old processes run. Watch what changes.
+
+The log remembers one thing clearly.
+The idle display remembers things only while it is moving.
