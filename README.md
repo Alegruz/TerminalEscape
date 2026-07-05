@@ -8,7 +8,7 @@ The player must:
 
 1. Read the entity guidance.
 2. Decrypt `/logs/shutdown.log.enc`.
-3. Find the hidden fragment in `/art/watcher.txt`.
+3. Follow the idle-art riddle for the other fragment.
 4. Combine the fragments into the sudo password.
 5. Run `sudo shutdown --cancel`, then enter the recovered password before the timer reaches zero.
 
@@ -24,12 +24,13 @@ Core commands include:
 help
 tiles
 cd /logs
+screensaver
 shutdown --cancel
 ls /logs
 ls -a /logs
 analyze /logs/shutdown.log.enc
 decrypt --method caesar --key <number> /logs/shutdown.log.enc
-cat /art/watcher.txt
+screensaver
 sudo shutdown --cancel
 sudo shutdown --wipe
 ```

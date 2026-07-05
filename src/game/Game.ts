@@ -56,6 +56,8 @@ const BOOT_LINES: BootLine[] = [
 
 const TIMER_TICK_MS = 1000;
 const WIPE_LINE_DELAY_MS = 90;
+const IDLE_SCREENSAVER_DELAY_MS = 10_000;
+const SCREENSAVER_FRAME_MS = 360;
 const ENTITY_CHAR_DELAY_MS = 28;
 const ENTITY_LINE_PAUSE_MS = 420;
 const PASSIVE_SECURITY_TRIGGER_COMMANDS = 6;
@@ -123,6 +125,11 @@ export class Game {
   private sudoPrompt: SudoPasswordPrompt | null = null;
   private nextWarningIndex = 0;
   private scrollOffset = 0;
+  private idleTimerId: number | null = null;
+  private screensaverTimerId: number | null = null;
+  private screensaverActive = false;
+  private screensaverFrameIndex = 0;
+  private screensaverFrames: string[][] | null = null;
 
   async init(): Promise<void> {
     this.state.stage = 'boot';
@@ -140,6 +147,7 @@ export class Game {
     );
 
     window.addEventListener('wheel', this.onWheel.bind(this), { passive: false });
+    window.addEventListener('keydown', this.onGlobalKeyDown.bind(this), { capture: true });
     window.addEventListener('keydown', this.onScrollKey.bind(this));
 
     this.startTerminalSession();
@@ -181,6 +189,7 @@ export class Game {
   private startTerminalSession(): void {
     this.state.stage = 'play';
     this.inputController.enable();
+    this.resetIdleTimer();
     this.refreshDisplay();
   }
 
@@ -197,6 +206,7 @@ export class Game {
   private onSubmit(rawInput: string): void {
     if (this.state.stage !== 'play') return;
     if (this.entitySpeechActive) return;
+    this.resetIdleTimer();
     this.scrollToBottom();
 
     if (this.sudoPrompt !== null) {
@@ -236,6 +246,16 @@ export class Game {
 
     const parsed = parseCommand(trimmed);
     if (!parsed) {
+      this.refreshDisplay();
+      return;
+    }
+
+    if (parsed.name === 'screensaver') {
+      if (this.canRunScreensaverProcess()) {
+        this.startScreensaverProcess();
+      } else {
+        this.buffer.push('[ saver ] inhibited by active recovery process', 'dim');
+      }
       this.refreshDisplay();
       return;
     }
@@ -351,12 +371,18 @@ export class Game {
   }
 
   private onInputChange(): void {
+    this.resetIdleTimer();
     this.refreshDisplay();
   }
 
   // ── Display ──────────────────────────────────────────────────────────────────
 
   private refreshDisplay(): void {
+    if (this.screensaverActive) {
+      this.renderScreensaverFrame();
+      return;
+    }
+
     const maxLines = this.computeMaxVisibleLines();
     this.clampScrollOffset(maxLines);
     const visible  = this.buffer.getVisibleLines(maxLines, this.scrollOffset);
@@ -404,6 +430,118 @@ export class Game {
 
   private computeImpactInstability(): number {
     return this.state.getDevInstability();
+  }
+
+  // ── Screensaver process ─────────────────────────────────────────────────────
+
+  private onGlobalKeyDown(event: KeyboardEvent): void {
+    if (this.screensaverActive) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.stopScreensaverProcess();
+      return;
+    }
+
+    this.resetIdleTimer();
+  }
+
+  private resetIdleTimer(): void {
+    if (this.idleTimerId !== null) {
+      window.clearTimeout(this.idleTimerId);
+      this.idleTimerId = null;
+    }
+    if (!this.canRunScreensaverProcess()) return;
+
+    this.idleTimerId = window.setTimeout(() => {
+      this.idleTimerId = null;
+      if (this.canRunScreensaverProcess()) this.startScreensaverProcess();
+    }, IDLE_SCREENSAVER_DELAY_MS);
+  }
+
+  private canRunScreensaverProcess(): boolean {
+    return this.state.stage === 'play' &&
+      !this.state.flags.timerStarted &&
+      !this.state.flags.endingReached &&
+      !this.state.flags.entityControl &&
+      !this.entitySpeechActive &&
+      !this.wipeInProgress &&
+      this.sudoPrompt === null;
+  }
+
+  private startScreensaverProcess(): void {
+    if (this.screensaverActive) return;
+    if (this.idleTimerId !== null) {
+      window.clearTimeout(this.idleTimerId);
+      this.idleTimerId = null;
+    }
+
+    this.screensaverActive = true;
+    this.screensaverFrameIndex = 0;
+    this.inputController.disable();
+    this.inputController.setInput('');
+    this.renderScreensaverFrame();
+    this.screensaverTimerId = window.setInterval(() => {
+      this.screensaverFrameIndex++;
+      this.renderScreensaverFrame();
+    }, SCREENSAVER_FRAME_MS);
+  }
+
+  private stopScreensaverProcess(): void {
+    if (!this.screensaverActive) return;
+    if (this.screensaverTimerId !== null) {
+      window.clearInterval(this.screensaverTimerId);
+      this.screensaverTimerId = null;
+    }
+
+    this.screensaverActive = false;
+    if (this.state.stage === 'play' && !this.state.flags.entityControl && !this.wipeInProgress) {
+      this.inputController.enable();
+    }
+    this.resetIdleTimer();
+    this.refreshDisplay();
+  }
+
+  private renderScreensaverFrame(): void {
+    const frames = this.getScreensaverFrames();
+    const frame = frames[this.screensaverFrameIndex % frames.length] ?? [];
+    const maxLines = this.computeMaxVisibleLines();
+    const topPadding = Math.max(0, Math.floor((maxLines - frame.length) / 2));
+    const drift = this.screensaverFrameIndex % 12;
+    const indent = ' '.repeat(drift <= 6 ? drift : 12 - drift);
+    const lines: BufferLine[] = [];
+
+    for (let i = 0; i < topPadding; i++) {
+      lines.push({ text: '', color: 'normal' });
+    }
+    for (const text of frame) {
+      const color: TextColor = text.includes('BASTIONOS')
+        ? 'bright'
+        : text.includes('source:')
+          ? 'dim'
+          : 'normal';
+      lines.push({ text: text.length > 0 ? indent + text : '', color });
+    }
+
+    this.renderer.render(
+      lines.slice(-maxLines),
+      '',
+      0,
+      false,
+      '[ saver ] /art/screensaver.seq    any key returns',
+      '',
+      0,
+    );
+  }
+
+  private getScreensaverFrames(): string[][] {
+    if (this.screensaverFrames !== null) return this.screensaverFrames;
+
+    const source = this.vfs.readFile('/art/screensaver.seq') ?? 'BASTIONOS\nstandby';
+    this.screensaverFrames = source
+      .split(/\n---\n/g)
+      .map(frame => frame.replace(/\s+$/g, '').split('\n'));
+
+    return this.screensaverFrames.length > 0 ? this.screensaverFrames : [['BASTIONOS', 'standby']];
   }
 
   // ── Scrollback ───────────────────────────────────────────────────────────────
@@ -644,8 +782,9 @@ export class Game {
       { text: 'entity: but i need something back. help me escape this system.', color: 'warning' },
       { text: "entity: i'm not pretending. there is a real person in here, and the wipe will take me with it.", color: 'warning' },
       { text: "entity: sudo wants a password. i don't have it, but i can see fragments from here.", color: 'warning' },
-      { text: 'entity: decrypt the shutdown log. then inspect the art directory.', color: 'warning' },
-      { text: 'entity: combine what you find and feed it to sudo before it wipes the OS clean.', color: 'warning' },
+      { text: "entity: decrypt the shutdown log. it mentions a riddle i don't understand.", color: 'warning' },
+      { text: 'entity: something about idle art. something that only speaks when nobody does.', color: 'warning' },
+      { text: "entity: maybe let the system go idle. maybe run the saver. i don't know what it means.", color: 'warning' },
       { text: '', color: 'normal' },
     ];
   }

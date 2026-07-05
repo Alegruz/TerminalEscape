@@ -61,6 +61,13 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
     completion: { args: 'path' },
   },
   {
+    name: 'screensaver',
+    description: 'Run the idle display process from the art directory.',
+    usage: 'screensaver',
+    examples: ['screensaver'],
+    completion: { args: 'none' },
+  },
+  {
     name: 'shutdown',
     description: 'Request host shutdown control.',
     usage: 'shutdown --cancel',

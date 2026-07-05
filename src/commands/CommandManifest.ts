@@ -4,6 +4,7 @@ import { helpCommand } from './help.ts';
 import { cdCommand } from './cd.ts';
 import { lsCommand } from './ls.ts';
 import { catCommand } from './cat.ts';
+import { screensaverCommand } from './screensaver.ts';
 import { analyzeCommand } from './analyze.ts';
 import { decryptCommand } from './decrypt.ts';
 import { sudoCommand } from './sudo.ts';
@@ -16,6 +17,7 @@ const HANDLERS: Record<string, CommandHandler> = {
   cd: cdCommand,
   ls: lsCommand,
   cat: catCommand,
+  screensaver: screensaverCommand,
   shutdown: shutdownCommand,
   sudo: sudoCommand,
   analyze: analyzeCommand,
