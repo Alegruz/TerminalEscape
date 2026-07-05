@@ -6,6 +6,7 @@
 export class InputController {
   private _input: string = '';
   private _cursorPos: number = 0;
+  private _selectionAnchor: number | null = null;
   /** True while the terminal is accepting user input. */
   private _enabled: boolean = false;
   /** True while Enter is allowed to submit the current input. */
@@ -37,6 +38,8 @@ export class InputController {
   get input(): string { return this._input; }
   get cursorPos(): number { return this._cursorPos; }
   get enabled(): boolean { return this._enabled; }
+  get selectionStart(): number { return this.selectionRange()?.start ?? this._cursorPos; }
+  get selectionEnd(): number { return this.selectionRange()?.end ?? this._cursorPos; }
 
   enable(): void  { this._enabled = true; }
   disable(): void { this._enabled = false; }
@@ -47,7 +50,42 @@ export class InputController {
   setInput(value: string): void {
     this._input = value;
     this._cursorPos = value.length;
+    this.clearSelection();
     this.onChange();
+  }
+
+  private selectionRange(): { start: number; end: number } | null {
+    if (this._selectionAnchor === null || this._selectionAnchor === this._cursorPos) return null;
+    return {
+      start: Math.min(this._selectionAnchor, this._cursorPos),
+      end: Math.max(this._selectionAnchor, this._cursorPos),
+    };
+  }
+
+  private clearSelection(): void {
+    this._selectionAnchor = null;
+  }
+
+  private moveCursor(nextPos: number, selecting: boolean): void {
+    const clamped = Math.max(0, Math.min(this._input.length, nextPos));
+    if (selecting && this._selectionAnchor === null) {
+      this._selectionAnchor = this._cursorPos;
+    }
+    this._cursorPos = clamped;
+    if (!selecting) this.clearSelection();
+    if (this._selectionAnchor === this._cursorPos) this.clearSelection();
+    this.onChange();
+  }
+
+  private replaceSelection(text: string): boolean {
+    const range = this.selectionRange();
+    if (range === null) return false;
+
+    this._input = this._input.slice(0, range.start) + text + this._input.slice(range.end);
+    this._cursorPos = range.start + text.length;
+    this.clearSelection();
+    this.onChange();
+    return true;
   }
 
   private previousWordBoundary(): number {
@@ -77,6 +115,7 @@ export class InputController {
         const cmd = this._input;
         this._input = '';
         this._cursorPos = 0;
+        this.clearSelection();
         this.onChange();
         this.onSubmit(cmd);
         break;
@@ -84,11 +123,15 @@ export class InputController {
 
       case 'Backspace': {
         e.preventDefault();
+        if (this.replaceSelection('')) {
+          break;
+        }
         if (e.ctrlKey) {
           const start = this.previousWordBoundary();
           if (start < this._cursorPos) {
             this._input = this._input.slice(0, start) + this._input.slice(this._cursorPos);
             this._cursorPos = start;
+            this.clearSelection();
             this.onChange();
           }
         } else if (this._cursorPos > 0) {
@@ -96,6 +139,7 @@ export class InputController {
             this._input.slice(0, this._cursorPos - 1) +
             this._input.slice(this._cursorPos);
           this._cursorPos--;
+          this.clearSelection();
           this.onChange();
         }
         break;
@@ -103,10 +147,14 @@ export class InputController {
 
       case 'Delete': {
         e.preventDefault();
+        if (this.replaceSelection('')) {
+          break;
+        }
         if (e.ctrlKey) {
           const end = this.nextWordBoundary();
           if (end > this._cursorPos) {
             this._input = this._input.slice(0, this._cursorPos) + this._input.slice(end);
+            this.clearSelection();
             this.onChange();
           }
         } else if (this._cursorPos < this._input.length) {
@@ -120,9 +168,14 @@ export class InputController {
 
       case 'ArrowLeft': {
         e.preventDefault();
-        const nextPos = e.ctrlKey ? this.previousWordBoundary() : this._cursorPos - 1;
+        const range = this.selectionRange();
+        const nextPos = !e.shiftKey && range !== null
+          ? range.start
+          : e.ctrlKey ? this.previousWordBoundary() : this._cursorPos - 1;
         if (nextPos >= 0 && nextPos !== this._cursorPos) {
-          this._cursorPos = nextPos;
+          this.moveCursor(nextPos, e.shiftKey);
+        } else if (!e.shiftKey) {
+          this.clearSelection();
           this.onChange();
         }
         break;
@@ -130,9 +183,14 @@ export class InputController {
 
       case 'ArrowRight': {
         e.preventDefault();
-        const nextPos = e.ctrlKey ? this.nextWordBoundary() : this._cursorPos + 1;
+        const range = this.selectionRange();
+        const nextPos = !e.shiftKey && range !== null
+          ? range.end
+          : e.ctrlKey ? this.nextWordBoundary() : this._cursorPos + 1;
         if (nextPos <= this._input.length && nextPos !== this._cursorPos) {
-          this._cursorPos = nextPos;
+          this.moveCursor(nextPos, e.shiftKey);
+        } else if (!e.shiftKey) {
+          this.clearSelection();
           this.onChange();
         }
         break;
@@ -140,15 +198,13 @@ export class InputController {
 
       case 'Home': {
         e.preventDefault();
-        this._cursorPos = 0;
-        this.onChange();
+        this.moveCursor(0, e.shiftKey);
         break;
       }
 
       case 'End': {
         e.preventDefault();
-        this._cursorPos = this._input.length;
-        this.onChange();
+        this.moveCursor(this._input.length, e.shiftKey);
         break;
       }
 
@@ -176,12 +232,15 @@ export class InputController {
       default: {
         // Printable characters only.
         if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-          this._input =
-            this._input.slice(0, this._cursorPos) +
-            e.key +
-            this._input.slice(this._cursorPos);
-          this._cursorPos++;
-          this.onChange();
+          if (!this.replaceSelection(e.key)) {
+            this._input =
+              this._input.slice(0, this._cursorPos) +
+              e.key +
+              this._input.slice(this._cursorPos);
+            this._cursorPos++;
+            this.clearSelection();
+            this.onChange();
+          }
         }
         break;
       }

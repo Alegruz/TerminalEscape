@@ -17,6 +17,7 @@ export class TerminalRenderer {
   private outputTexts: Text[] = [];
   private statusText!: Text;
   private inputText!: Text;
+  private selectionGraphic!: Graphics;
   private cursorGraphic!: Graphics;
   private scanlineGraphic!: Graphics;
   private borderGraphic!: Graphics;
@@ -38,6 +39,8 @@ export class TerminalRenderer {
   private lastLines: BufferLine[] = [];
   private lastInput = '';
   private lastCursorPos = -1;
+  private lastSelectionStart = -1;
+  private lastSelectionEnd = -1;
   private lastStatusLine = '';
   private lastPrompt = '';
   private lastOutputMode: OutputMode = 'normal';
@@ -97,6 +100,9 @@ export class TerminalRenderer {
       }),
     });
     this.app.stage.addChild(this.statusText);
+
+    this.selectionGraphic = new Graphics();
+    this.app.stage.addChild(this.selectionGraphic);
 
     // Input / prompt line.
     this.inputText = new Text({
@@ -197,6 +203,8 @@ export class TerminalRenderer {
     prompt: string,
     instability: number = 0,
     outputMode: OutputMode = 'normal',
+    selectionStart: number = cursorPos,
+    selectionEnd: number = cursorPos,
   ): void {
     if (this.crashed) return;
 
@@ -207,6 +215,8 @@ export class TerminalRenderer {
       visibleLines.some((l, i) => !this.linesEqual(l, this.lastLines[i])) ||
       inputValue !== this.lastInput ||
       cursorPos !== this.lastCursorPos ||
+      selectionStart !== this.lastSelectionStart ||
+      selectionEnd !== this.lastSelectionEnd ||
       statusLine !== this.lastStatusLine ||
       prompt !== this.lastPrompt ||
       normalizedInstability !== this.instability ||
@@ -216,6 +226,8 @@ export class TerminalRenderer {
       this.lastLines = visibleLines;
       this.lastInput = inputValue;
       this.lastCursorPos = cursorPos;
+      this.lastSelectionStart = selectionStart;
+      this.lastSelectionEnd = selectionEnd;
       this.lastStatusLine = statusLine;
       this.lastPrompt = prompt;
       this.lastOutputMode = outputMode;
@@ -227,6 +239,8 @@ export class TerminalRenderer {
     this._pendingLines = visibleLines;
     this._pendingInput = inputValue;
     this._pendingCursorPos = cursorPos;
+    this._pendingSelectionStart = selectionStart;
+    this._pendingSelectionEnd = selectionEnd;
     this._pendingInputEnabled = inputEnabled;
     this._pendingStatusLine = statusLine;
     this._pendingPrompt = prompt;
@@ -282,6 +296,8 @@ export class TerminalRenderer {
   private _pendingLines: BufferLine[] = [];
   private _pendingInput: string = '';
   private _pendingCursorPos: number = 0;
+  private _pendingSelectionStart: number = 0;
+  private _pendingSelectionEnd: number = 0;
   private _pendingInputEnabled: boolean = false;
   private _pendingStatusLine: string = '';
   private _pendingPrompt: string = '';
@@ -291,6 +307,8 @@ export class TerminalRenderer {
     const lines = this.wrapVisibleLines(this._pendingLines);
     const inputValue = this._pendingInput;
     const cursorPos = this._pendingCursorPos;
+    const selectionStart = this._pendingSelectionStart;
+    const selectionEnd = this._pendingSelectionEnd;
     const inputEnabled = this._pendingInputEnabled;
     const statusLine = this._pendingStatusLine;
     const prompt = this._pendingPrompt;
@@ -329,6 +347,21 @@ export class TerminalRenderer {
     this.inputText.text = promptText;
     this.inputText.x = THEME.paddingX;
     this.inputText.y = inputY;
+
+    this.selectionGraphic.clear();
+    if (inputEnabled && selectionStart !== selectionEnd) {
+      const start = Math.max(0, Math.min(inputValue.length, Math.min(selectionStart, selectionEnd)));
+      const end = Math.max(0, Math.min(inputValue.length, Math.max(selectionStart, selectionEnd)));
+      const beforeSelection = prompt + inputValue.slice(0, start);
+      const selectedText = inputValue.slice(start, end);
+      const selectionX = THEME.paddingX + this.measureInputTextWidth(beforeSelection);
+      const selectionY = inputY + (THEME.lineHeight - THEME.fontSize - 2) / 2;
+      const selectionW = Math.max(this.getCursorWidth(), this.measureInputTextWidth(selectedText));
+      const selectionH = THEME.fontSize + 4;
+      this.selectionGraphic
+        .rect(selectionX, selectionY, selectionW, selectionH)
+        .fill({ color: THEME.cursorColor, alpha: 0.35 });
+    }
 
     // Cursor block.
     this.cursorGraphic.clear();
@@ -374,6 +407,8 @@ export class TerminalRenderer {
 
     this.statusText.x = THEME.paddingX + shakeX + this.randomSigned(2 * this.instability);
     this.inputText.x = THEME.paddingX + shakeX;
+    this.selectionGraphic.x = shakeX;
+    this.selectionGraphic.y = shakeY;
     this.cursorGraphic.x = shakeX;
     this.cursorGraphic.y = shakeY;
     this.scanlineGraphic.alpha = 1 + Math.random() * THEME.scanlineFlickerAlpha * this.instability;
@@ -409,6 +444,8 @@ export class TerminalRenderer {
     }
     this.statusText.x = THEME.paddingX;
     this.inputText.x = THEME.paddingX;
+    this.selectionGraphic.x = 0;
+    this.selectionGraphic.y = 0;
     this.cursorGraphic.x = 0;
     this.cursorGraphic.y = 0;
     this.scanlineGraphic.alpha = 1;

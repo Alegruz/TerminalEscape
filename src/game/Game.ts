@@ -415,6 +415,9 @@ export class Game {
       this.buildLiveStatusLine(),
       this.buildPrompt(),
       this.computeImpactInstability(),
+      'normal',
+      this.inputController?.selectionStart ?? 0,
+      this.inputController?.selectionEnd ?? 0,
     );
   }
 
