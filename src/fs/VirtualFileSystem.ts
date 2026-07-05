@@ -42,11 +42,11 @@ export class VirtualFileSystem {
 
   // ── Operations ───────────────────────────────────────────────────────────────
 
-  listDir(absolutePath: string): string[] | null {
+  listDir(absolutePath: string, options: { includeHidden?: boolean } = {}): string[] | null {
     const node = this.getNode(absolutePath);
     if (!node || node.type !== 'dir') return null;
     return Object.entries(node.children)
-      .filter(([, child]) => child.type !== 'file' || child.header?.hidden !== true)
+      .filter(([, child]) => options.includeHidden || child.type !== 'file' || child.header?.hidden !== true)
       .map(([name]) => name)
       .sort();
   }
@@ -79,7 +79,7 @@ export class VirtualFileSystem {
 
   /** Return all absolute paths that start with `prefix` (for autocomplete). */
   listWithPrefix(absoluteDir: string, namePrefix: string): string[] {
-    const names = this.listDir(absoluteDir) ?? [];
+    const names = this.listDir(absoluteDir, { includeHidden: namePrefix.startsWith('.') }) ?? [];
     return names.filter(n => n.startsWith(namePrefix));
   }
 

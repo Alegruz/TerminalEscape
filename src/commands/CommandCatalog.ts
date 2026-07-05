@@ -34,11 +34,24 @@ export const COMMAND_CATALOG: CommandCatalogEntry[] = [
     completion: { args: 'none' },
   },
   {
+    name: 'cd',
+    description: 'Change the current directory.',
+    usage: 'cd [path]',
+    examples: ['cd /logs', 'cd /art', 'cd ..'],
+    completion: { args: 'path' },
+  },
+  {
     name: 'ls',
     description: 'List directory contents.',
-    usage: 'ls [path]',
-    examples: ['ls', 'ls /logs', 'ls /art'],
-    completion: { args: 'path' },
+    usage: 'ls [-a|--all] [path]',
+    examples: ['ls', 'ls -a', 'ls -a /logs', 'ls /art'],
+    completion: {
+      args: 'path',
+      options: [
+        { name: '-a' },
+        { name: '--all' },
+      ],
+    },
   },
   {
     name: 'cat',

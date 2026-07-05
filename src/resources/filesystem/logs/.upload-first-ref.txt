@@ -1,0 +1,11 @@
+REFERENCE TRACE B
+
+title:
+  Uploading Brain into Computer: Whom to Upload First?
+
+link:
+  https://arxiv.org/abs/1811.03009
+
+local note:
+  The entity cites this when asked why it expects the system to choose
+  the first upload candidate instead of the safest one.

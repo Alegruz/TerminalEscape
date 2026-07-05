@@ -33,7 +33,10 @@ export type FSFileHeader = {
 const RESOURCE_ROOT = '../resources/filesystem/';
 const HEADER_SUFFIX = '.header';
 
-const resourceFiles = import.meta.glob<string>('../resources/filesystem/**/*', {
+const resourceFiles = import.meta.glob<string>([
+  '../resources/filesystem/**/*',
+  '../resources/filesystem/**/.*',
+], {
   eager: true,
   import: 'default',
   query: '?raw',

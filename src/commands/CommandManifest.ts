@@ -1,6 +1,7 @@
 import type { CommandHandler, CommandRegistry } from '../terminal/CommandRegistry.ts';
 import { COMMAND_ALIASES, COMMAND_CATALOG } from './CommandCatalog.ts';
 import { helpCommand } from './help.ts';
+import { cdCommand } from './cd.ts';
 import { lsCommand } from './ls.ts';
 import { catCommand } from './cat.ts';
 import { analyzeCommand } from './analyze.ts';
@@ -12,6 +13,7 @@ import { shutdownCommand } from './power.ts';
 const HANDLERS: Record<string, CommandHandler> = {
   help: helpCommand,
   tiles: tilesCommand,
+  cd: cdCommand,
   ls: lsCommand,
   cat: catCommand,
   shutdown: shutdownCommand,

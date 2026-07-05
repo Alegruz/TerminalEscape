@@ -1,0 +1,12 @@
+ARES RECOVERY INDEX
+
+record class: resident-process research trace
+status      : hidden from standard directory scans
+
+The resident process keeps returning to two external references:
+
+  /logs/.continuum-ref.txt
+  /logs/.upload-first-ref.txt
+
+Both files are outside the password path.
+Both files are inside the question the entity refuses to answer.

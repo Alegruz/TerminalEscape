@@ -1,0 +1,12 @@
+REFERENCE TRACE A
+
+title:
+  Continuum of consciousness: Mind uploading and resurrection of human
+  consciousness. Is there a place for physics, neuroscience and computers?
+
+link:
+  https://arxiv.org/abs/0710.2556
+
+local note:
+  The entity cites this when asked whether a copied mind is a person,
+  a continuation, or only a useful artifact with familiar memories.

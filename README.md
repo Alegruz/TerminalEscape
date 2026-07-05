@@ -23,8 +23,10 @@ Core commands include:
 ```sh
 help
 tiles
+cd /logs
 shutdown --cancel
 ls /logs
+ls -a /logs
 analyze /logs/shutdown.log.enc
 decrypt --method caesar --key <number> /logs/shutdown.log.enc
 cat /art/watcher.txt

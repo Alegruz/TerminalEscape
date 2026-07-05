@@ -7,18 +7,20 @@ export function lsCommand(
   ctx: CommandContext,
 ): OutputLine[] {
   const { state, vfs } = ctx;
+  const includeHidden = cmd.flags.a === true || cmd.flags.all === true;
+  const pathArg = cmd.args[0];
   const target =
-    cmd.args.length > 0
-      ? vfs.resolve(state.currentPath, cmd.args[0])
+    pathArg
+      ? vfs.resolve(state.currentPath, pathArg)
       : state.currentPath;
 
-  const entries = vfs.listDir(target);
+  const entries = vfs.listDir(target, { includeHidden });
   if (entries === null) {
     const nodeType = vfs.getNodeType(target);
     if (nodeType === 'file') {
-      return [out(`ls: ${cmd.args[0] ?? target}: not a directory`, 'error')];
+      return [out(`ls: ${pathArg ?? target}: not a directory`, 'error')];
     }
-    return [out(`ls: ${cmd.args[0] ?? target}: no such file or directory`, 'error')];
+    return [out(`ls: ${pathArg ?? target}: no such file or directory`, 'error')];
   }
 
   if (entries.length === 0) {
